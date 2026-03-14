@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>紙箱設計工具 Box Design Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',sans-serif;background:#f0f0f0;overflow:hidden;height:100vh;width:100vw}
+#small-screen-msg{display:none;position:fixed;inset:0;background:#fff;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-size:1.2rem;color:#333}
+@media(max-width:1279px){#small-screen-msg{display:flex}#app{display:none}}
+#app{display:flex;flex-direction:column;height:100vh;width:100vw}
+
+/* Toolbar */
+#toolbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#ffffff;border-bottom:1px solid #e0e0e0;height:44px;flex-shrink:0;user-select:none}
+.tb-group{display:flex;align-items:center;gap:4px;border-right:1px solid #e0e0e0;padding-right:8px;margin-right:4px}
+.tb-group:last-child{border-right:none}
+.tb-btn{display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 10px;border-radius:5px;border:1px solid #ddd;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;font-size:12px;color:#333;white-space:nowrap;transition:all 0.15s}
+.tb-btn:hover{background:#f5f5f5;border-color:#bbb}
+.tb-btn.active{background:#4361EE;color:#fff;border-color:#4361EE}
+.tb-btn.cam{background:#f8f8f8}
+.tb-btn.cam:hover{background:#eee}
+.tb-sep{width:1px;height:20px;background:#e0e0e0;margin:0 4px}
+#app-title{font-weight:700;font-size:14px;color:#222;margin-right:8px;font-family:'IBM Plex Mono',monospace}
+
+/* Main area */
+#main{display:flex;flex:1;overflow:hidden;position:relative}
+#canvas-area{flex:1;position:relative;background:#f8f8f8}
+#threejs-canvas{position:absolute;inset:0;width:100%;height:100%}
+#svg-area{position:absolute;inset:0;width:100%;height:100%;display:none;background:#fff;overflow:hidden}
+#svg-area svg{width:100%;height:100%}
+
+/* Right panel */
+#right-panel{width:260px;background:#fff;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#right-panel.collapsed{width:32px;overflow:hidden}
+#panel-toggle{position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:14px;height:40px;background:#fff;border:1px solid #e0e0e0;border-right:none;border-radius:4px 0 0 4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888}
+#panel-inner{padding:12px;position:relative}
+.section-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px}
+.section-title:first-child{margin-top:0}
+.input-row{display:flex;align-items:center;margin-bottom:8px;gap:6px}
+.input-row label{width:32px;font-size:12px;color:#555;font-family:'IBM Plex Mono',monospace;font-weight:500;flex-shrink:0}
+.input-row input{flex:1;height:30px;border:1px solid #ddd;border-radius:4px;padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:#222;outline:none;transition:border 0.15s}
+.input-row input:focus{border-color:#4361EE}
+.input-row span{font-size:11px;color:#888;width:20px;flex-shrink:0}
+.result-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:2px 0}
+.result-label{font-size:11px;color:#888}
+.result-val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#222;font-weight:500}
+.result-val.highlight{color:#E63946;font-weight:700}
+.export-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:7px;border-radius:5px;border:1px solid #ddd;background:#f8f8f8;cursor:pointer;font-family:'Noto Sans TC',sans-serif;font-size:12px;color:#333;margin-bottom:6px;transition:all 0.15s}
+.export-btn:hover{background:#eee;border-color:#bbb}
+.export-btn.primary{background:#4361EE;color:#fff;border-color:#4361EE}
+.export-btn.primary:hover{background:#3451de}
+hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
+
+/* Status bar */
+#statusbar{height:28px;background:#222;color:#ccc;display:flex;align-items:center;padding:0 12px;gap:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-shrink:0}
+.sb-item{display:flex;align-items:center;gap:6px}
+.sb-label{color:#888}
+.sb-val{color:#e0e0e0}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.15);width:560px;max-height:80vh;display:flex;flex-direction:column}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eee}
+.modal-title{font-weight:700;font-size:15px;color:#222}
+.modal-close{width:28px;height:28px;border-radius:4px;border:1px solid #eee;background:#f8f8f8;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:#888}
+.modal-close:hover{background:#eee}
+.modal-body{padding:16px;overflow-y:auto;flex:1}
+.search-input{width:100%;height:34px;border:1px solid #ddd;border-radius:5px;padding:0 10px;font-size:13px;margin-bottom:12px;outline:none}
+.search-input:focus{border-color:#4361EE}
+.box-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.box-card{padding:12px;border:1.5px solid #eee;border-radius:6px;cursor:pointer;transition:all 0.15s}
+.box-card:hover{border-color:#4361EE;background:#f5f7ff}
+.box-card.selected{border-color:#4361EE;background:#edf0ff}
+.box-card-code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4361EE;font-weight:500;margin-bottom:2px}
+.box-card-name{font-weight:700;font-size:13px;color:#222;margin-bottom:2px}
+.box-card-desc{font-size:11px;color:#888;line-height:1.4}
+.box-icon{width:100%;height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.box-icon svg{max-width:80px;max-height:55px}
+
+/* History panel */
+.history-modal{width:440px}
+.hist-entry{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.1s}
+.hist-entry:hover{background:#f8f8f8}
+.hist-info{flex:1}
+.hist-code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#4361EE;font-weight:500}
+.hist-dims{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#888}
+.hist-time{font-size:10px;color:#bbb}
+.hist-del{width:24px;height:24px;border-radius:3px;border:1px solid #eee;background:#f8f8f8;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#E63946;font-size:12px}
+.hist-del:hover{background:#fee}
+
+/* Notification */
+#notify{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:5px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:9999}
+</style>
+</head>
+<body>
+
+<div id="small-screen-msg">
+  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+  <div style="font-size:1.3rem;font-weight:700;color:#333">請使用較大螢幕</div>
+  <div style="color:#888;font-size:0.9rem">本工具需要 1280px 以上的螢幕寬度</div>
+</div>
+
+<div id="app">
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div class="app-title" style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;color:#222;margin-right:8px">BOX TOOL</div>
+    <div class="tb-group">
+      <button class="tb-btn active" id="btn-3d" onclick="setView('3d')">3D 預覽</button>
+      <button class="tb-btn" id="btn-svg" onclick="setView('svg')">展開圖</button>
+    </div>
+    <div class="tb-group">
+      <button class="tb-btn cam" onclick="setCam('front')">正面</button>
+      <button class="tb-btn cam" onclick="setCam('side')">側面</button>
+      <button class="tb-btn cam" onclick="setCam('top')">頂部</button>
+      <button class="tb-btn cam" onclick="setCam('flat')">展開</button>
+    </div>
+    <div class="tb-group">
+      <button class="tb-btn" onclick="showLibrary()">📦 箱型庫</button>
+      <button class="tb-btn" onclick="showHistory()">🕓 歷史記錄</button>
+    </div>
+    <div style="flex:1"></div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#aaa" id="box-type-label">FEFCO 0201 / RSC</div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="canvas-area">
+      <canvas id="threejs-canvas"></canvas>
+      <div id="svg-area"></div>
+    </div>
+
+    <!-- Right panel -->
+    <div id="right-panel">
+      <div id="panel-inner">
+        <div class="section-title">尺寸輸入 (mm)</div>
+        <div class="input-row"><label>L</label><input type="number" id="inp-L" value="300" min="10" max="5000"><span>mm</span></div>
+        <div class="input-row"><label>W</label><input type="number" id="inp-W" value="200" min="10" max="5000"><span>mm</span></div>
+        <div class="input-row"><label>H</label><input type="number" id="inp-H" value="150" min="10" max="5000"><span>mm</span></div>
+        <div class="input-row"><label>CAL</label><input type="number" id="inp-CAL" value="3" min="0" max="20" step="0.5"><span>mm</span></div>
+
+        <hr class="divider">
+        <div class="section-title">計算結果</div>
+        <div id="calc-results"></div>
+
+        <hr class="divider">
+        <div class="section-title">匯出</div>
+        <button class="export-btn primary" onclick="exportSVG()">⬇ 匯出 SVG</button>
+        <button class="export-btn" onclick="exportDXF()">⬇ 匯出 DXF</button>
+        <button class="export-btn" onclick="exportPDF()">⬇ 匯出 PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusbar">
+    <div class="sb-item"><span class="sb-label">箱型</span><span class="sb-val" id="sb-code">FEFCO 0201</span></div>
+    <div class="sb-item"><span class="sb-label">製造尺寸</span><span class="sb-val" id="sb-mfg">—</span></div>
+    <div class="sb-item"><span class="sb-label">外部尺寸</span><span class="sb-val" id="sb-ext">—</span></div>
+  </div>
+</div>
+
+<!-- Box Library Modal -->
+<div class="overlay" id="overlay-lib">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">箱型庫 Box Library</span>
+      <button class="modal-close" onclick="closeOverlay('overlay-lib')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="search-input" id="lib-search" placeholder="搜尋箱型名稱或代碼..." oninput="filterLibrary()">
+      <div class="box-grid" id="box-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="overlay" id="overlay-hist">
+  <div class="modal history-modal">
+    <div class="modal-header">
+      <span class="modal-title">歷史記錄</span>
+      <div style="display:flex;gap:8px">
+        <button class="tb-btn" onclick="clearHistory()" style="font-size:11px;color:#E63946">清除全部</button>
+        <button class="modal-close" onclick="closeOverlay('overlay-hist')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="hist-list"></div>
+  </div>
+</div>
+
+<!-- Notification -->
+<div id="notify"></div>
+
+<script>
+// ============================================================
+// BOX DEFINITIONS
+// ============================================================
+const BOX_LIBRARY = [
+  {
+    code: 'FEFCO-0201',
+    label: 'FEFCO 0201 / RSC',
+    nameCN: '對插蓋紙箱',
+    nameEN: 'Regular Slotted Container',
+    desc: '最常見的瓦楞紙箱型，四片側板加上頂底蓋翼。',
+    calc(L, W, H, CAL) {
+      const flapW_inner = Math.floor(W / 2);
+      const flapW_outer = Math.ceil(W / 2);
+      const flapH = Math.round(H / 2);
+      const panelA_w = L + CAL;
+      const panelA_h = H + 2 * CAL;
+      const panelB_w = W + CAL;
+      const panelB_h = H + 2 * CAL;
+      const mfgW = (L + CAL) * 2 + (W + CAL) * 2;
+      const mfgH = H + CAL * 2;
+      const extL = L + 2 * CAL;
+      const extW = W + 2 * CAL;
+      const extH = H + 2 * CAL;
+      return {
+        panelA_w, panelA_h, panelB_w, panelB_h,
+        flapW_inner, flapW_outer, flapH,
+        mfgW, mfgH, extL, extW, extH,
+        rows: [
+          ['面板 A 寬', panelA_w],
+          ['面板 B 寬', panelB_w],
+          ['面板高', panelA_h],
+          ['蓋翼長(內)', flapW_inner],
+          ['蓋翼長(外)', flapW_outer],
+          ['蓋翼高', flapH],
+          ['製造寬', mfgW, true],
+          ['製造高', mfgH, true],
+          ['外部 L', extL],
+          ['外部 W', extW],
+          ['外部 H', extH],
+        ]
+      };
+    },
+    svgGen(L, W, H, CAL, vw, vh) {
+      return gen0201SVG(L, W, H, CAL, vw, vh);
+    },
+    build3D(L, W, H, CAL, scene) {
+      return build0201_3D(L, W, H, CAL, scene);
+    }
+  },
+  {
+    code: 'FEFCO-0300',
+    label: 'FEFCO 0300',
+    nameCN: '單片折疊盤',
+    nameEN: 'One-piece Folder',
+    desc: '單片展開，四邊折起形成淺盤，角落有鎖合舌片。',
+    calc(L, W, H, CAL) {
+      const mfgW = L + 2 * (H + CAL);
+      const mfgH = W + 2 * (H + CAL);
+      const extL = L + 2 * CAL;
+      const extW = W + 2 * CAL;
+      const extH = H + 2 * CAL;
+      return {
+        mfgW, mfgH, extL, extW, extH,
+        rows: [
+          ['底部 L', L],
+          ['底部 W', W],
+          ['側邊高', H],
+          ['製造寬', mfgW, true],
+          ['製造高', mfgH, true],
+          ['外部 L', extL],
+          ['外部 W', extW],
+          ['外部 H', extH],
+        ]
+      };
+    },
+    svgGen(L, W, H, CAL, vw, vh) {
+      return gen0300SVG(L, W, H, CAL, vw, vh);
+    },
+    build3D(L, W, H, CAL, scene) {
+      return build0300_3D(L, W, H, CAL, scene);
+    }
+  },
+  {
+    code: 'FEFCO-0401',
+    label: 'FEFCO 0401',
+    nameCN: '天地蓋紙箱',
+    nameEN: 'Set-up Box (Lid & Base)',
+    desc: '兩件式天地蓋，天蓋覆蓋地盒頂部，適合禮品包裝。',
+    calc(L, W, H, CAL) {
+      const lidH = Math.round(H / 3);
+      const baseH = H - lidH;
+      const lidL = L + 2 * CAL;
+      const lidW = W + 2 * CAL;
+      const mfgW_lid = lidL + 2 * (lidH + CAL);
+      const mfgH_lid = lidW + 2 * (lidH + CAL);
+      const mfgW_base = L + 2 * (baseH + CAL);
+      const mfgH_base = W + 2 * (baseH + CAL);
+      const extL = L + 2 * CAL;
+      const extW = W + 2 * CAL;
+      const extH = H + 2 * CAL;
+      return {
+        lidH, baseH, lidL, lidW,
+        mfgW_lid, mfgH_lid, mfgW_base, mfgH_base,
+        extL, extW, extH,
+        rows: [
+          ['天蓋內尺寸 L', lidL],
+          ['天蓋內尺寸 W', lidW],
+          ['天蓋高', lidH],
+          ['地盒高', baseH],
+          ['天蓋製造寬', mfgW_lid, true],
+          ['天蓋製造高', mfgH_lid, true],
+          ['地盒製造寬', mfgW_base, true],
+          ['地盒製造高', mfgH_base, true],
+          ['外部 L', extL],
+          ['外部 W', extW],
+          ['外部 H', extH],
+        ]
+      };
+    },
+    svgGen(L, W, H, CAL, vw, vh) {
+      return gen0401SVG(L, W, H, CAL, vw, vh);
+    },
+    build3D(L, W, H, CAL, scene) {
+      return build0401_3D(L, W, H, CAL, scene);
+    }
+  }
+];
+
+let currentBoxIdx = 0;
+let currentView = '3d';
+let calcData = null;
+
+// ============================================================
+// STATE
+// ============================================================
+function getInputs() {
+  return {
+    L: parseFloat(document.getElementById('inp-L').value) || 300,
+    W: parseFloat(document.getElementById('inp-W').value) || 200,
+    H: parseFloat(document.getElementById('inp-H').value) || 150,
+    CAL: parseFloat(document.getElementById('inp-CAL').value) || 3
+  };
+}
+
+// ============================================================
+// CALCULATE & RENDER
+// ============================================================
+let debounceTimer = null;
+function onInputChange() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(updateAll, 300);
+}
+
+function updateAll() {
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+  calcData = box.calc(L, W, H, CAL);
+
+  // Results panel
+  const container = document.getElementById('calc-results');
+  container.innerHTML = '';
+  calcData.rows.forEach(([label, val, hi]) => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.innerHTML = `<span class="result-label">${label}</span><span class="result-val${hi ? ' highlight' : ''}">${val} mm</span>`;
+    container.appendChild(row);
+  });
+
+  // Status bar
+  document.getElementById('sb-code').textContent = box.code.replace('-', ' ');
+  document.getElementById('box-type-label').textContent = box.label;
+
+  const mfgW = calcData.mfgW || calcData.mfgW_base || '—';
+  const mfgH = calcData.mfgH || calcData.mfgH_base || '—';
+  document.getElementById('sb-mfg').textContent = `${mfgW} × ${mfgH} mm`;
+  document.getElementById('sb-ext').textContent = `${calcData.extL} × ${calcData.extW} × ${calcData.extH} mm`;
+
+  // SVG / 3D
+  if (currentView === 'svg') renderSVG();
+  else render3D();
+
+  saveHistory(L, W, H, CAL, box.code);
+}
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function renderSVG() {
+  const svgArea = document.getElementById('svg-area');
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+  const vw = svgArea.clientWidth || 800;
+  const vh = svgArea.clientHeight || 600;
+  svgArea.innerHTML = box.svgGen(L, W, H, CAL, vw, vh);
+}
+
+// SVG helper: scale flat diagram to viewport
+function calcScale(flatW, flatH, vw, vh, margin) {
+  margin = margin || 60;
+  const scaleX = (vw - margin * 2) / flatW;
+  const scaleY = (vh - margin * 2) / flatH;
+  const scale = Math.min(scaleX, scaleY, 1.5);
+  const ox = (vw - flatW * scale) / 2;
+  const oy = (vh - flatH * scale) / 2;
+  return { scale, ox, oy };
+}
+
+function svgLine(x1, y1, x2, y2, layer) {
+  if (layer === 'cut') return `<line x1="${r(x1)}" y1="${r(y1)}" x2="${r(x2)}" y2="${r(y2)}" stroke="#E63946" stroke-width="1.2" fill="none"/>`;
+  return `<line x1="${r(x1)}" y1="${r(y1)}" x2="${r(x2)}" y2="${r(y2)}" stroke="#4361EE" stroke-width="1" stroke-dasharray="5,3" fill="none"/>`;
+}
+
+function svgRect(x, y, w, h, layer) {
+  const lines = [
+    svgLine(x, y, x+w, y, layer),
+    svgLine(x+w, y, x+w, y+h, layer),
+    svgLine(x+w, y+h, x, y+h, layer),
+    svgLine(x, y+h, x, y, layer),
+  ];
+  return lines.join('');
+}
+
+function svgDim(x1, y1, x2, y2, label, outside) {
+  // Simple dimension annotation
+  const mx = (x1+x2)/2, my = (y1+y2)/2;
+  const isH = Math.abs(y2-y1) < 2; // horizontal dim
+  const offset = outside ? -18 : 18;
+  const tx = isH ? mx : mx - (outside ? 30 : -30);
+  const ty = isH ? my - (outside ? 16 : -16) : my;
+  return `<line x1="${r(x1)}" y1="${r(y1)}" x2="${r(x2)}" y2="${r(y2)}" stroke="#aaa" stroke-width="0.7"/>
+  <text x="${r(tx)}" y="${r(ty)}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-family="IBM Plex Mono,monospace" fill="#888">${label}</text>`;
+}
+
+function r(n) { return Math.round(n * 10) / 10; }
+
+// ---- FEFCO 0201 SVG ----
+function gen0201SVG(L, W, H, CAL, vw, vh) {
+  const d = BOX_LIBRARY[0].calc(L, W, H, CAL);
+  const { panelA_w, panelA_h, panelB_w, flapW_inner, flapW_outer, flapH } = d;
+
+  // Layout: [flapOuter | A1 | flapInner] [B1] [A2] [B2] [glue]
+  // Total flat width = flapW_outer + panelA_w + panelB_w + panelA_w + panelB_w + some glue
+  // Total flat height = flapH + panelA_h + flapH (= H + 2*CAL + 2*flapH = H+CAL*2 + H)
+
+  const glue = CAL + 5;
+  const flatW = flapW_outer + panelA_w + panelB_w + panelA_w + panelB_w + glue;
+  const flatH = flapH + panelA_h + flapH;
+
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 70);
+  const s = v => v * scale;
+  const tx = v => ox + v * scale;
+  const ty = v => oy + v * scale;
+
+  let cuts = '', folds = '';
+
+  // Column x positions (before scaling, in mm)
+  let cx = flapW_outer;  // left edge of A1 panel
+  const xA1 = cx;
+  const xB1 = cx + panelA_w;
+  const xA2 = xB1 + panelB_w;
+  const xB2 = xA2 + panelA_w;
+  const xGlue = xB2 + panelB_w;
+
+  // Row y positions
+  const yTop = 0;          // top of top flaps
+  const yPanel = flapH;    // top of main panels
+  const yBotFlap = flapH + panelA_h;  // top of bottom flaps
+
+  // === MAIN PANELS (cut outline) ===
+  // Outer rectangle of whole blank
+  cuts += svgLine(tx(0), ty(yTop + flapH), tx(flapW_outer), ty(yTop + flapH), 'cut'); // left edge top flap bottom
+  // Draw each column as fold/cut mix
+
+  // A1 panel outline
+  folds += svgLine(tx(xA1), ty(yPanel), tx(xA1), ty(yPanel + panelA_h), 'fold'); // left fold line of A1
+  folds += svgLine(tx(xB1), ty(yPanel), tx(xB1), ty(yPanel + panelA_h), 'fold'); // right fold (B1 left)
+  folds += svgLine(tx(xA2), ty(yPanel), tx(xA2), ty(yPanel + panelA_h), 'fold');
+  folds += svgLine(tx(xB2), ty(yPanel), tx(xB2), ty(yPanel + panelA_h), 'fold');
+  folds += svgLine(tx(xGlue), ty(yPanel), tx(xGlue), ty(yPanel + panelA_h), 'fold');
+
+  // Horizontal fold lines
+  folds += svgLine(tx(0), ty(yPanel), tx(xGlue + glue), ty(yPanel), 'fold');
+  folds += svgLine(tx(0), ty(yBotFlap), tx(xGlue + glue), ty(yBotFlap), 'fold');
+
+  // Outer cut boundary
+  cuts += svgRect(tx(0), ty(yTop), s(flatW), s(flatH), 'cut');
+
+  // Top flaps cut slots (between A and B panels)
+  // Slots: between B and A panels at top and bottom
+  const slotY_top = ty(yTop);
+  const slotY_bot = ty(yBotFlap + flapH);
+
+  // Cut slots between panels at top: between A1/B1, B1/A2, A2/B2
+  function topFlapCut(panelX, flapLen, side) {
+    // side flap edge cut
+    const fx = tx(panelX);
+    const fw = s(flapLen);
+    const fy = ty(yTop);
+    const fh = s(flapH);
+    // horizontal slot cut line at panel boundary
+    return '';
+  }
+
+  // Top flaps for A panels (width = flapW_inner or flapW_outer)
+  // A1 top flap
+  cuts += svgRect(tx(flapW_outer), ty(yTop), s(panelA_w), s(flapH), 'cut');
+  // B1 top flap
+  cuts += svgRect(tx(xB1), ty(yTop), s(flapW_inner), s(flapH), 'cut');
+  // The outer B1 flap would be at left... actually let me draw the full layout properly
+
+  // Left outer flap (glue/tuck)
+  cuts += svgRect(tx(0), ty(yPanel), s(flapW_outer), s(panelA_h), 'cut');
+  // A2 top flap
+  cuts += svgRect(tx(xA2), ty(yTop), s(panelA_w), s(flapH), 'cut');
+  // B2 top flap (outer = ceil(W/2))
+  cuts += svgRect(tx(xB2), ty(yTop), s(flapW_outer), s(flapH), 'cut');
+  // A1 bottom flap
+  cuts += svgRect(tx(flapW_outer), ty(yBotFlap), s(panelA_w), s(flapH), 'cut');
+  // B1 bottom flap
+  cuts += svgRect(tx(xB1), ty(yBotFlap), s(flapW_inner), s(flapH), 'cut');
+  // A2 bottom flap
+  cuts += svgRect(tx(xA2), ty(yBotFlap), s(panelA_w), s(flapH), 'cut');
+  // B2 bottom flap
+  cuts += svgRect(tx(xB2), ty(yBotFlap), s(flapW_outer), s(flapH), 'cut');
+
+  // Glue tab
+  cuts += svgRect(tx(xGlue), ty(yPanel), s(glue), s(panelA_h), 'cut');
+
+  // Dimension annotations (outside the blank)
+  const dimY = ty(yTop) - 12;
+  const dimYBot = ty(flatH) + 12;
+
+  // Overall dims
+  const dims = svgDim(tx(0), ty(yTop)-8, tx(flatW), ty(yTop)-8, `${r(flatW)} mm`, true)
+    + svgDim(tx(flatW)+8, ty(yTop), tx(flatW)+8, ty(flatH), `${r(flatH)} mm`, false);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
+  <g id="dims">${dims}</g>
+  <g id="fold">${folds}</g>
+  <g id="cut">${cuts}</g>
+  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0201 RSC — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+</svg>`;
+}
+
+// ---- FEFCO 0300 SVG ----
+function gen0300SVG(L, W, H, CAL, vw, vh) {
+  const d = BOX_LIBRARY[1].calc(L, W, H, CAL);
+  const { mfgW, mfgH } = d;
+  const flatW = mfgW;
+  const flatH = mfgH;
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 70);
+  const s = v => v * scale;
+  const tx = v => ox + v * scale;
+  const ty = v => oy + v * scale;
+
+  // Layout: corner tabs + sides around center bottom
+  let cuts = '', folds = '';
+  const tab = H;
+  // Center bottom
+  const cx = H + CAL;
+  const cy = H + CAL;
+  // Outer boundary
+  cuts += svgRect(tx(0), ty(0), s(flatW), s(flatH), 'cut');
+  // Fold lines: horizontal
+  folds += svgLine(tx(0), ty(cy), tx(flatW), ty(cy), 'fold');
+  folds += svgLine(tx(0), ty(cy + W), tx(flatW), ty(cy + W), 'fold');
+  // Fold lines: vertical
+  folds += svgLine(tx(cx), ty(0), tx(cx), ty(flatH), 'fold');
+  folds += svgLine(tx(cx + L), ty(0), tx(cx + L), ty(flatH), 'fold');
+
+  // Corner tabs (cut out)
+  const corners = [
+    [tx(0), ty(0), s(cx), s(cy)],
+    [tx(cx + L), ty(0), s(H + CAL), s(cy)],
+    [tx(0), ty(cy + W), s(cx), s(H + CAL)],
+    [tx(cx + L), ty(cy + W), s(H + CAL), s(H + CAL)],
+  ];
+  corners.forEach(([x, y, w, h]) => {
+    // draw X through corner to show cutout
+    folds += svgLine(x, y, x+w, y+h, 'fold');
+    folds += svgLine(x+w, y, x, y+h, 'fold');
+  });
+
+  const dims = svgDim(tx(0), ty(0)-10, tx(flatW), ty(0)-10, `${r(flatW)} mm`, true)
+    + svgDim(tx(flatW)+10, ty(0), tx(flatW)+10, ty(flatH), `${r(flatH)} mm`, false);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
+  <g id="dims">${dims}</g>
+  <g id="fold">${folds}</g>
+  <g id="cut">${cuts}</g>
+  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0300 — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+</svg>`;
+}
+
+// ---- FEFCO 0401 SVG ----
+function gen0401SVG(L, W, H, CAL, vw, vh) {
+  const d = BOX_LIBRARY[2].calc(L, W, H, CAL);
+  const { lidH, baseH, lidL, lidW, mfgW_lid, mfgH_lid, mfgW_base, mfgH_base } = d;
+
+  // Draw lid on left, base on right side by side
+  const gap = 20;
+  const totalW = mfgW_lid + gap + mfgW_base;
+  const totalH = Math.max(mfgH_lid, mfgH_base);
+  const { scale, ox, oy } = calcScale(totalW, totalH, vw, vh, 70);
+  const s = v => v * scale;
+  const tx = v => ox + v * scale;
+  const ty = v => oy + (totalH - (v > mfgW_lid + gap ? mfgH_base : mfgH_lid)) / 2 * scale;
+
+  let cuts = '', folds = '';
+
+  // LID
+  cuts += svgRect(tx(0), oy * 1, s(mfgW_lid), s(mfgH_lid), 'cut');
+  folds += svgLine(tx(lidH + CAL), oy * 1, tx(lidH + CAL), oy * 1 + s(mfgH_lid), 'fold');
+  folds += svgLine(tx(mfgW_lid - lidH - CAL), oy * 1, tx(mfgW_lid - lidH - CAL), oy * 1 + s(mfgH_lid), 'fold');
+  folds += svgLine(tx(0), oy * 1 + s(lidH + CAL), tx(mfgW_lid), oy * 1 + s(lidH + CAL), 'fold');
+  folds += svgLine(tx(0), oy * 1 + s(mfgH_lid - lidH - CAL), tx(mfgW_lid), oy * 1 + s(mfgH_lid - lidH - CAL), 'fold');
+
+  // BASE
+  const bx = mfgW_lid + gap;
+  cuts += svgRect(tx(bx), oy * 1, s(mfgW_base), s(mfgH_base), 'cut');
+  folds += svgLine(tx(bx + baseH + CAL), oy * 1, tx(bx + baseH + CAL), oy * 1 + s(mfgH_base), 'fold');
+  folds += svgLine(tx(bx + mfgW_base - baseH - CAL), oy * 1, tx(bx + mfgW_base - baseH - CAL), oy * 1 + s(mfgH_base), 'fold');
+  folds += svgLine(tx(bx), oy * 1 + s(baseH + CAL), tx(bx + mfgW_base), oy * 1 + s(baseH + CAL), 'fold');
+  folds += svgLine(tx(bx), oy * 1 + s(mfgH_base - baseH - CAL), tx(bx + mfgW_base), oy * 1 + s(mfgH_base - baseH - CAL), 'fold');
+
+  // Labels
+  const label = `<text x="${tx(mfgW_lid/2)}" y="${oy - 12}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono,monospace" fill="#4361EE">天蓋 LID</text>
+<text x="${tx(bx + mfgW_base/2)}" y="${oy - 12}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono,monospace" fill="#E63946">地盒 BASE</text>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
+  <g id="dims">${label}</g>
+  <g id="fold">${folds}</g>
+  <g id="cut">${cuts}</g>
+  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0401 天地蓋 — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+</svg>`;
+}
+
+// ============================================================
+// THREE.JS 3D
+// ============================================================
+let renderer, scene, camera, controls, animFrameId;
+
+function initThree() {
+  const canvas = document.getElementById('threejs-canvas');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(0xf8f8f8, 1);
+
+  scene = new THREE.Scene();
+
+  const ca = document.getElementById('canvas-area');
+  const w = ca.clientWidth, h = ca.clientHeight;
+  camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 10000);
+  camera.position.set(500, 400, 600);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  // Lights
+  const amb = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  dir.position.set(1, 2, 1).normalize();
+  scene.add(dir);
+
+  resizeRenderer();
+  animate();
+}
+
+function animate() {
+  animFrameId = requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function resizeRenderer() {
+  const ca = document.getElementById('canvas-area');
+  const w = ca.clientWidth, h = ca.clientHeight;
+  renderer.setSize(w, h);
+  if (camera) {
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+
+function clearScene() {
+  while (scene && scene.children.length > 3) {
+    scene.remove(scene.children[scene.children.length - 1]);
+  }
+}
+
+function render3D() {
+  clearScene();
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+  box.build3D(L, W, H, CAL, scene);
+}
+
+const CARDBOARD = new THREE.MeshLambertMaterial({ color: 0xD4A574, side: THREE.DoubleSide });
+const CARDBOARD_EDGE = new THREE.MeshLambertMaterial({ color: 0xB8895A, side: THREE.DoubleSide });
+
+function makePanel(w, h, mat) {
+  const geo = new THREE.BoxGeometry(w, h, 2);
+  return new THREE.Mesh(geo, mat || CARDBOARD);
+}
+
+function addPanel(parent, w, h, x, y, z, rx, ry, rz) {
+  const m = makePanel(w, h);
+  m.position.set(x, y, z);
+  if (rx) m.rotation.x = rx;
+  if (ry) m.rotation.y = ry;
+  if (rz) m.rotation.z = rz;
+  (parent || scene).add(m);
+  return m;
+}
+
+// 0201 3D - assembled box (open top)
+function build0201_3D(L, W, H, CAL, scene) {
+  const group = new THREE.Group();
+  const T = 2; // thickness in 3D
+  // Bottom
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), CARDBOARD);
+  bottom.rotation.x = Math.PI / 2;
+  bottom.position.y = 0;
+  group.add(bottom);
+  // Front (L face)
+  const front = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), CARDBOARD);
+  front.position.set(0, H / 2, W / 2);
+  group.add(front);
+  // Back
+  const back = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), CARDBOARD);
+  back.position.set(0, H / 2, -W / 2);
+  group.add(back);
+  // Left (W face)
+  const left = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), CARDBOARD);
+  left.rotation.y = Math.PI / 2;
+  left.position.set(-L / 2, H / 2, 0);
+  group.add(left);
+  // Right
+  const right = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), CARDBOARD);
+  right.rotation.y = Math.PI / 2;
+  right.position.set(L / 2, H / 2, 0);
+  group.add(right);
+  // Bottom flaps (closed)
+  const flapLen = Math.round(W / 2);
+  const flapH = Math.round(H / 2);
+  // Front bottom flap
+  const bf1 = new THREE.Mesh(new THREE.BoxGeometry(L, flapLen, T), CARDBOARD_EDGE);
+  bf1.rotation.x = Math.PI / 2;
+  bf1.position.set(0, T, W / 2 - flapLen / 2);
+  // Don't add flaps to keep it simple / open top look
+  group.position.y = H / 2;
+  scene.add(group);
+}
+
+// 0300 3D - tray assembled
+function build0300_3D(L, W, H, CAL, scene) {
+  const group = new THREE.Group();
+  const T = 2;
+  // Bottom
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), CARDBOARD);
+  bottom.rotation.x = Math.PI / 2;
+  group.add(bottom);
+  // Four sides
+  const sides = [
+    { size: [L, H, T], pos: [0, H/2, W/2], rot: [0, 0, 0] },
+    { size: [L, H, T], pos: [0, H/2, -W/2], rot: [0, 0, 0] },
+    { size: [W, H, T], pos: [-L/2, H/2, 0], rot: [0, Math.PI/2, 0] },
+    { size: [W, H, T], pos: [L/2, H/2, 0], rot: [0, Math.PI/2, 0] },
+  ];
+  sides.forEach(({ size, pos, rot }) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), CARDBOARD);
+    m.position.set(...pos);
+    m.rotation.set(...rot);
+    group.add(m);
+  });
+  group.position.y = H / 2;
+  scene.add(group);
+}
+
+// 0401 3D - lid and base slightly separated
+function build0401_3D(L, W, H, CAL, scene) {
+  const d = BOX_LIBRARY[2].calc(L, W, H, CAL);
+  const { lidH, baseH } = d;
+  const T = 2;
+  const sep = 30; // separation between lid and base
+
+  // BASE group
+  const base = new THREE.Group();
+  const bBottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), CARDBOARD);
+  bBottom.rotation.x = Math.PI / 2;
+  base.add(bBottom);
+  [[L, baseH, 0, baseH/2, W/2, 0], [L, baseH, 0, baseH/2, -W/2, 0],
+   [W, baseH, Math.PI/2, baseH/2, 0, -L/2], [W, baseH, Math.PI/2, baseH/2, 0, L/2]
+  ].forEach(([sw, sh, ry, py, pz, px]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, T), CARDBOARD);
+    m.rotation.y = ry;
+    m.position.set(px, py, pz);
+    base.add(m);
+  });
+  base.position.y = baseH / 2;
+  scene.add(base);
+
+  // LID group (slightly above, inverted)
+  const lid = new THREE.Group();
+  const lidL2 = L + 2 * CAL, lidW2 = W + 2 * CAL;
+  const lBottom = new THREE.Mesh(new THREE.BoxGeometry(lidL2, lidW2, T), CARDBOARD_EDGE);
+  lBottom.rotation.x = Math.PI / 2;
+  lid.add(lBottom);
+  [[lidL2, lidH, 0, lidH/2, lidW2/2, 0], [lidL2, lidH, 0, lidH/2, -lidW2/2, 0],
+   [lidW2, lidH, Math.PI/2, lidH/2, 0, -lidL2/2], [lidW2, lidH, Math.PI/2, lidH/2, 0, lidL2/2]
+  ].forEach(([sw, sh, ry, py, pz, px]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, T), CARDBOARD_EDGE);
+    m.rotation.y = ry;
+    m.position.set(px, py, pz);
+    lid.add(m);
+  });
+  // Lid sits above the base
+  lid.position.y = baseH + sep + lidH;
+  lid.rotation.x = Math.PI; // flipped
+  lid.position.y = baseH + sep;
+  scene.add(lid);
+}
+
+// ============================================================
+// CAMERA PRESETS
+// ============================================================
+function setCam(preset) {
+  if (!camera || !controls) return;
+  const { L, W, H } = getInputs();
+  const d = Math.max(L, W, H) * 2.5;
+  switch (preset) {
+    case 'front':
+      camera.position.set(0, H, d);
+      camera.up.set(0, 1, 0);
+      break;
+    case 'side':
+      camera.position.set(d, H, 0);
+      camera.up.set(0, 1, 0);
+      break;
+    case 'top':
+      camera.position.set(0, d, 0.01);
+      camera.up.set(0, 0, -1);
+      break;
+    case 'flat':
+      setView('svg');
+      return;
+  }
+  controls.target.set(0, H / 2, 0);
+  controls.update();
+}
+
+// ============================================================
+// VIEW TOGGLE
+// ============================================================
+function setView(v) {
+  currentView = v;
+  const svgArea = document.getElementById('svg-area');
+  const threejsCanvas = document.getElementById('threejs-canvas');
+  document.getElementById('btn-3d').classList.toggle('active', v === '3d');
+  document.getElementById('btn-svg').classList.toggle('active', v === 'svg');
+  if (v === 'svg') {
+    svgArea.style.display = 'block';
+    threejsCanvas.style.display = 'none';
+    renderSVG();
+  } else {
+    svgArea.style.display = 'none';
+    threejsCanvas.style.display = 'block';
+    render3D();
+  }
+}
+
+// ============================================================
+// EXPORT: SVG
+// ============================================================
+function exportSVG() {
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+  const svgStr = box.svgGen(L, W, H, CAL, 1000, 700);
+  const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${box.code}_${L}x${W}x${H}_CAL${CAL}.svg`;
+  a.click();
+  notify('SVG 已匯出');
+}
+
+// ============================================================
+// EXPORT: DXF
+// ============================================================
+function exportDXF() {
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+
+  // Get SVG lines for DXF conversion
+  const svgStr = box.svgGen(L, W, H, CAL, 1000, 700);
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+
+  let entities = '';
+
+  function addLine(x1, y1, x2, y2, layer) {
+    entities += `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${(-y1).toFixed(4)}\n30\n0.0\n11\n${x2.toFixed(4)}\n21\n${(-y2).toFixed(4)}\n31\n0.0\n`;
+  }
+
+  // Parse cut group
+  const cutG = doc.getElementById('cut');
+  const foldG = doc.getElementById('fold');
+
+  function processGroup(g, layer) {
+    if (!g) return;
+    g.querySelectorAll('line').forEach(el => {
+      addLine(+el.getAttribute('x1'), +el.getAttribute('y1'),
+               +el.getAttribute('x2'), +el.getAttribute('y2'), layer);
+    });
+  }
+
+  processGroup(cutG, '0');
+  processGroup(foldG, 'FOLD');
+
+  const dxf = `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n2\n0\nLAYER\n2\n0\n70\n0\n62\n1\n6\nCONTINUOUS\n0\nLAYER\n2\nFOLD\n70\n0\n62\n5\n6\nDASHED\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entities}0\nENDSEC\n0\nEOF\n`;
+
+  const blob = new Blob([dxf], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${box.code}_${L}x${W}x${H}_CAL${CAL}.dxf`;
+  a.click();
+  notify('DXF 已匯出');
+}
+
+// ============================================================
+// EXPORT: PDF
+// ============================================================
+function exportPDF() {
+  const { L, W, H, CAL } = getInputs();
+  const box = BOX_LIBRARY[currentBoxIdx];
+  const { jsPDF } = window.jspdf;
+  const doc2 = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pw = 210, ph = 297;
+
+  // Header
+  doc2.setFont('helvetica', 'bold');
+  doc2.setFontSize(14);
+  doc2.text(box.label, 15, 18);
+  doc2.setFont('helvetica', 'normal');
+  doc2.setFontSize(9);
+  doc2.text(`Generated: ${new Date().toLocaleString()}`, 15, 25);
+  doc2.text(`Dimensions: L${L} × W${W} × H${H} mm  CAL: ${CAL}mm`, 15, 30);
+
+  // SVG to canvas to PDF
+  const svgStr = box.svgGen(L, W, H, CAL, 750, 500);
+  const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = function() {
+    const cv = document.createElement('canvas');
+    cv.width = 750; cv.height = 500;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 750, 500);
+    ctx.drawImage(img, 0, 0);
+    const imgData = cv.toDataURL('image/png');
+    doc2.addImage(imgData, 'PNG', 15, 35, pw - 30, (pw - 30) * 500 / 750);
+
+    // Dimension table
+    let yy = 35 + (pw - 30) * 500 / 750 + 8;
+    doc2.setFontSize(10);
+    doc2.setFont('helvetica', 'bold');
+    doc2.text('計算結果', 15, yy);
+    yy += 6;
+    doc2.setFont('helvetica', 'normal');
+    doc2.setFontSize(9);
+    if (calcData && calcData.rows) {
+      calcData.rows.forEach(([label, val]) => {
+        doc2.text(`${label}: ${val} mm`, 18, yy);
+        yy += 5;
+      });
+    }
+    doc2.save(`${box.code}_${L}x${W}x${H}_CAL${CAL}.pdf`);
+    URL.revokeObjectURL(url);
+    notify('PDF 已匯出');
+  };
+  img.src = url;
+}
+
+// ============================================================
+// LIBRARY POPUP
+// ============================================================
+function showLibrary() {
+  renderBoxGrid('');
+  document.getElementById('overlay-lib').classList.add('show');
+  document.getElementById('lib-search').focus();
+}
+
+function filterLibrary() {
+  renderBoxGrid(document.getElementById('lib-search').value);
+}
+
+function renderBoxGrid(query) {
+  const grid = document.getElementById('box-grid');
+  grid.innerHTML = '';
+  const q = query.trim().toLowerCase();
+  BOX_LIBRARY.forEach((box, i) => {
+    if (q && !box.code.toLowerCase().includes(q) &&
+        !box.nameCN.includes(query) &&
+        !box.nameEN.toLowerCase().includes(q)) return;
+    const card = document.createElement('div');
+    card.className = `box-card${i === currentBoxIdx ? ' selected' : ''}`;
+    card.innerHTML = `
+      <div class="box-icon">${getBoxIcon(box.code)}</div>
+      <div class="box-card-code">${box.code}</div>
+      <div class="box-card-name">${box.nameCN}</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:2px">${box.nameEN}</div>
+      <div class="box-card-desc">${box.desc}</div>`;
+    card.onclick = () => { selectBox(i); closeOverlay('overlay-lib'); };
+    grid.appendChild(card);
+  });
+}
+
+function getBoxIcon(code) {
+  if (code === 'FEFCO-0201') return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="10" width="70" height="35" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="20" y1="10" x2="20" y2="45" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="45" y1="10" x2="45" y2="45" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="62" y1="10" x2="62" y2="45" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <rect x="5" y="2" width="15" height="8" stroke="#E63946" stroke-width="1"/>
+    <rect x="20" y="2" width="25" height="8" stroke="#E63946" stroke-width="1"/>
+    <rect x="45" y="2" width="17" height="8" stroke="#E63946" stroke-width="1"/>
+    <rect x="62" y="2" width="13" height="8" stroke="#E63946" stroke-width="1"/>
+  </svg>`;
+  if (code === 'FEFCO-0300') return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="5" width="70" height="45" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="18" y1="5" x2="18" y2="50" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="62" y1="5" x2="62" y2="50" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="5" y1="18" x2="75" y2="18" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="5" y1="37" x2="75" y2="37" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+  </svg>`;
+  return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="3" width="34" height="24" stroke="#4361EE" stroke-width="1.5"/>
+    <rect x="41" y="3" width="34" height="49" stroke="#E63946" stroke-width="1.5"/>
+    <text x="22" y="18" text-anchor="middle" font-size="8" fill="#4361EE">LID</text>
+    <text x="58" y="30" text-anchor="middle" font-size="8" fill="#E63946">BASE</text>
+  </svg>`;
+}
+
+function selectBox(i) {
+  currentBoxIdx = i;
+  updateAll();
+}
+
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+const HIST_KEY = 'boxlib_history';
+let historyEnabled = true;
+
+function saveHistory(L, W, H, CAL, boxCode) {
+  try {
+    let hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+    const entry = { id: Date.now(), boxCode, L, W, H, CAL, timestamp: new Date().toISOString() };
+    // Avoid duplicates
+    hist = hist.filter(e => !(e.boxCode === boxCode && e.L === L && e.W === W && e.H === H && e.CAL === CAL));
+    hist.unshift(entry);
+    if (hist.length > 50) hist = hist.slice(0, 50);
+    localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+  } catch (e) {
+    historyEnabled = false;
+  }
+}
+
+function showHistory() {
+  renderHistoryList();
+  document.getElementById('overlay-hist').classList.add('show');
+}
+
+function renderHistoryList() {
+  const container = document.getElementById('hist-list');
+  if (!historyEnabled) {
+    container.innerHTML = '<div style="color:#E63946;font-size:12px;padding:8px">⚠ localStorage 不可用（私密模式？）</div>';
+    return;
+  }
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) {}
+  if (hist.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:12px;padding:8px;text-align:center">暫無歷史記錄</div>';
+    return;
+  }
+  container.innerHTML = hist.map(e => `
+    <div class="hist-entry" onclick="loadHistory('${e.id}')">
+      <div class="hist-info">
+        <div class="hist-code">${e.boxCode}</div>
+        <div class="hist-dims">L${e.L} × W${e.W} × H${e.H}  CAL${e.CAL}mm</div>
+        <div class="hist-time">${new Date(e.timestamp).toLocaleString()}</div>
+      </div>
+      <button class="hist-del" onclick="event.stopPropagation();deleteHistory('${e.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function loadHistory(id) {
+  try {
+    const hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+    const e = hist.find(h => String(h.id) === String(id));
+    if (!e) return;
+    const boxIdx = BOX_LIBRARY.findIndex(b => b.code === e.boxCode);
+    if (boxIdx >= 0) currentBoxIdx = boxIdx;
+    document.getElementById('inp-L').value = e.L;
+    document.getElementById('inp-W').value = e.W;
+    document.getElementById('inp-H').value = e.H;
+    document.getElementById('inp-CAL').value = e.CAL;
+    closeOverlay('overlay-hist');
+    updateAll();
+  } catch(err) {}
+}
+
+function deleteHistory(id) {
+  try {
+    let hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+    hist = hist.filter(e => String(e.id) !== String(id));
+    localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+    renderHistoryList();
+  } catch(e) {}
+}
+
+function clearHistory() {
+  if (!confirm('確定要清除全部歷史記錄？')) return;
+  try { localStorage.removeItem(HIST_KEY); } catch(e) {}
+  renderHistoryList();
+  notify('歷史記錄已清除');
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
+function notify(msg) {
+  const el = document.getElementById('notify');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  // Input listeners
+  ['inp-L','inp-W','inp-H','inp-CAL'].forEach(id => {
+    document.getElementById(id).addEventListener('input', onInputChange);
+  });
+
+  // Close overlays on backdrop click
+  document.querySelectorAll('.overlay').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target === el) el.classList.remove('show');
+    });
+  });
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    resizeRenderer();
+    if (currentView === 'svg') renderSVG();
+  });
+
+  // Init Three.js
+  initThree();
+
+  // Initial calculation
+  updateAll();
+});
+</script>
+</body>
+</html>

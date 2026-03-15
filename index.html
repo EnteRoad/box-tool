@@ -685,9 +685,9 @@ function resizeRenderer() {
 }
 
 function clearScene() {
-  while (scene && scene.children.length > 3) {
-    scene.remove(scene.children[scene.children.length - 1]);
-  }
+  if (!scene) return;
+  const toRemove = scene.children.filter(c => c.userData.isBoxModel);
+  toRemove.forEach(c => scene.remove(c));
 }
 
 function render3D() {
@@ -751,6 +751,7 @@ function build0201_3D(L, W, H, CAL, scene) {
   bf1.position.set(0, T, W / 2 - flapLen / 2);
   // Don't add flaps to keep it simple / open top look
   group.position.y = H / 2;
+  group.userData.isBoxModel = true;
   scene.add(group);
 }
 
@@ -776,6 +777,7 @@ function build0300_3D(L, W, H, CAL, scene) {
     group.add(m);
   });
   group.position.y = H / 2;
+  group.userData.isBoxModel = true;
   scene.add(group);
 }
 
@@ -800,6 +802,7 @@ function build0401_3D(L, W, H, CAL, scene) {
     base.add(m);
   });
   base.position.y = baseH / 2;
+  base.userData.isBoxModel = true;
   scene.add(base);
 
   // LID group (slightly above, inverted)
@@ -820,6 +823,7 @@ function build0401_3D(L, W, H, CAL, scene) {
   lid.position.y = baseH + sep + lidH;
   lid.rotation.x = Math.PI; // flipped
   lid.position.y = baseH + sep;
+  lid.userData.isBoxModel = true;
   scene.add(lid);
 }
 

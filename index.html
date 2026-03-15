@@ -161,10 +161,11 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
     <div id="right-panel">
       <div id="panel-inner">
         <div class="section-title">尺寸輸入 (mm)</div>
-        <div class="input-row"><label>L</label><input type="number" id="inp-L" value="300" min="10" max="5000"><span>mm</span></div>
-        <div class="input-row"><label>W</label><input type="number" id="inp-W" value="200" min="10" max="5000"><span>mm</span></div>
-        <div class="input-row"><label>H</label><input type="number" id="inp-H" value="150" min="10" max="5000"><span>mm</span></div>
-        <div class="input-row"><label>CAL</label><input type="number" id="inp-CAL" value="3" min="0" max="20" step="0.5"><span>mm</span></div>
+        <div class="input-row"><label>L</label><input type="number" id="inp-L" value="300" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
+        <div class="input-row"><label>W</label><input type="number" id="inp-W" value="200" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
+        <div class="input-row"><label>H</label><input type="number" id="inp-H" value="150" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
+        <div class="input-row"><label>CAL</label><input type="number" id="inp-CAL" value="3" min="0" max="20" step="0.5" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
+        <button id="btn-submit" class="export-btn primary" style="margin-top:4px" onclick="submitDims()">生成</button>
 
         <hr class="divider">
         <div class="section-title">計算結果</div>
@@ -398,10 +399,16 @@ function getInputs() {
 // ============================================================
 // CALCULATE & RENDER
 // ============================================================
-let debounceTimer = null;
 function onInputChange() {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(updateAll, 300);
+  // Mark the submit button as "pending" so user knows dims changed
+  const btn = document.getElementById('btn-submit');
+  if (btn) { btn.textContent = '生成 ●'; btn.style.background = '#E63946'; btn.style.borderColor = '#E63946'; }
+}
+
+function submitDims() {
+  const btn = document.getElementById('btn-submit');
+  if (btn) { btn.textContent = '生成'; btn.style.background = ''; btn.style.borderColor = ''; }
+  updateAll();
 }
 
 function updateAll() {
@@ -759,6 +766,13 @@ function render3D() {
   const { L, W, H, CAL } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
   box.build3D(L, W, H, CAL, scene);
+  // Point camera at box centre & fit distance
+  if (controls) {
+    const dim = Math.max(L, W, H);
+    controls.target.set(0, H / 2, 0);
+    camera.position.set(dim * 1.4, dim * 1.0, dim * 1.8);
+    controls.update();
+  }
 }
 
 // ============================================================
@@ -928,11 +942,13 @@ function build0201_3D(L, W, H, CAL, scene) {
 
   // ---- 4 SIDE WALLS ----
   // Front (z = +W/2)
-  group.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat),
-    { position: new THREE.Vector3(0, H/2, W/2) }));
+  const fwall = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat);
+  fwall.position.set(0, H/2, W/2);
+  group.add(fwall);
   // Back (z = -W/2)
-  group.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat),
-    { position: new THREE.Vector3(0, H/2, -W/2) }));
+  const bwall = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat);
+  bwall.position.set(0, H/2, -W/2);
+  group.add(bwall);
   // Left (x = -L/2)
   const lwall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mat);
   lwall.rotation.y = Math.PI/2; lwall.position.set(-L/2, H/2, 0);

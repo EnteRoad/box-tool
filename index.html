@@ -96,6 +96,26 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
 .hist-del{width:24px;height:24px;border-radius:3px;border:1px solid #eee;background:#f8f8f8;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#E63946;font-size:12px}
 .hist-del:hover{background:#fee}
 
+/* Animation controls */
+.anim-row{display:flex;gap:5px;margin-bottom:8px}
+.anim-btn{flex:1;padding:5px 4px;border-radius:5px;border:1px solid #ddd;background:#f8f8f8;cursor:pointer;font-family:'Noto Sans TC',sans-serif;font-size:11px;color:#333;text-align:center;transition:all 0.15s}
+.anim-btn:hover{background:#eee;border-color:#bbb}
+.anim-btn.playing{background:#4361EE;color:#fff;border-color:#4361EE}
+.fold-track{position:relative;margin-bottom:4px}
+.fold-slider{width:100%;height:4px;accent-color:#4361EE;cursor:pointer}
+.fold-labels{display:flex;justify-content:space-between;font-size:10px;color:#bbb;margin-top:1px}
+.speed-row{display:flex;align-items:center;gap:6px;margin-top:4px}
+.speed-row span{font-size:10px;color:#aaa;white-space:nowrap}
+.speed-slider{flex:1;height:3px;accent-color:#4361EE;cursor:pointer}
+/* Color swatches */
+.swatch-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+.swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border 0.15s;flex-shrink:0}
+.swatch.active{border-color:#222}
+/* Light sliders */
+.light-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.light-label{font-size:11px;color:#888;width:38px;flex-shrink:0}
+.light-slider{flex:1;height:3px;accent-color:#4361EE;cursor:pointer}
+
 /* Notification */
 #notify{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:5px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:9999}
 </style>
@@ -149,6 +169,38 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
         <hr class="divider">
         <div class="section-title">計算結果</div>
         <div id="calc-results"></div>
+
+        <hr class="divider">
+        <div class="section-title">3D 折疊動畫</div>
+        <div class="anim-row">
+          <button class="anim-btn" id="btn-play" onclick="toggleFoldAnim()">▶ 播放</button>
+          <button class="anim-btn" onclick="resetFoldAnim()">↺ 重置</button>
+          <button class="anim-btn" id="btn-autospin" onclick="toggleAutoSpin()">⟳ 旋轉</button>
+        </div>
+        <div class="fold-track">
+          <input type="range" class="fold-slider" id="fold-slider" min="0" max="100" value="0" oninput="onFoldSlider(this.value)">
+          <div class="fold-labels"><span>開蓋</span><span>合蓋</span></div>
+        </div>
+        <div class="speed-row">
+          <span>速度 慢</span>
+          <input type="range" class="speed-slider" id="speed-slider" min="0.4" max="4" step="0.1" value="1.5">
+          <span>快</span>
+        </div>
+
+        <hr class="divider">
+        <div class="section-title">紙板顏色</div>
+        <div class="swatch-row" id="color-swatches"></div>
+
+        <hr class="divider">
+        <div class="section-title">燈光</div>
+        <div class="light-row">
+          <span class="light-label">全局光</span>
+          <input type="range" class="light-slider" id="light-amb" min="0" max="2.5" step="0.05" value="0.7" oninput="updateLights()">
+        </div>
+        <div class="light-row">
+          <span class="light-label">泛光</span>
+          <input type="range" class="light-slider" id="light-dir" min="0" max="2.5" step="0.05" value="0.8" oninput="updateLights()">
+        </div>
 
         <hr class="divider">
         <div class="section-title">匯出</div>
@@ -353,6 +405,12 @@ function onInputChange() {
 }
 
 function updateAll() {
+  // Kill any running fold animation when dimensions change
+  if (_foldTween) { _foldTween.kill(); _foldTween = null; }
+  const btnPlay = document.getElementById('btn-play');
+  if (btnPlay) { btnPlay.textContent = '▶ 播放'; btnPlay.classList.remove('playing'); }
+  window._flapPivots = null;  // cleared; will be repopulated by build0201_3D
+
   const { L, W, H, CAL } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
   calcData = box.calc(L, W, H, CAL);
@@ -658,11 +716,14 @@ function initThree() {
   controls.enableDamping = true;
 
   // Lights
-  const amb = new THREE.AmbientLight(0xffffff, 0.7);
-  scene.add(amb);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-  dir.position.set(1, 2, 1).normalize();
-  scene.add(dir);
+  _ambLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(_ambLight);
+  _dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  _dirLight.position.set(1, 2, 1).normalize();
+  scene.add(_dirLight);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  fillLight.position.set(-1, 0.5, -1).normalize();
+  scene.add(fillLight);
 
   resizeRenderer();
   animate();
@@ -671,6 +732,9 @@ function initThree() {
 function animate() {
   animFrameId = requestAnimationFrame(animate);
   controls.update();
+  if (_autoSpinActive && scene) {
+    scene.children.forEach(c => { if (c.userData.isBoxModel) c.rotation.y += 0.008; });
+  }
   renderer.render(scene, camera);
 }
 
@@ -697,6 +761,138 @@ function render3D() {
   box.build3D(L, W, H, CAL, scene);
 }
 
+// ============================================================
+// FOLD ANIMATION
+// ============================================================
+window._foldState = { t: 0 };
+window._flapPivots = null;
+let _foldTween = null;
+let _autoSpinActive = false;
+
+// ease in-out cubic
+function _eio(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+function _applyFoldAngle(t) {
+  const p = window._flapPivots;
+  if (!p) return;
+  // Phase 1 (0→0.45): minor flaps (left/right) close
+  const t1 = _eio(Math.min(t / 0.45, 1));
+  // Phase 2 (0.45→1): major flaps (front/back) close
+  const t2 = _eio(Math.max((t - 0.45) / 0.55, 0));
+  const minorAngle = Math.PI * (1 - t1);
+  const majorAngle = Math.PI * (1 - t2);
+  p.left.rotation.z  = minorAngle;
+  p.right.rotation.z = minorAngle;
+  p.front.rotation.x = majorAngle;
+  p.back.rotation.x  = majorAngle;
+}
+
+function setFoldProgress(t) {
+  window._foldState.t = Math.max(0, Math.min(1, t));
+  _applyFoldAngle(window._foldState.t);
+  const slider = document.getElementById('fold-slider');
+  if (slider) slider.value = Math.round(window._foldState.t * 100);
+}
+
+function onFoldSlider(val) {
+  if (_foldTween) { _foldTween.kill(); _foldTween = null; }
+  document.getElementById('btn-play').textContent = '▶ 播放';
+  document.getElementById('btn-play').classList.remove('playing');
+  setFoldProgress(val / 100);
+}
+
+function toggleFoldAnim() {
+  // Only 0201 supports fold animation
+  if (currentBoxIdx !== 0 || !window._flapPivots) {
+    notify('折疊動畫僅支援 FEFCO 0201'); return;
+  }
+  if (_foldTween && _foldTween.isActive()) {
+    _foldTween.pause();
+    document.getElementById('btn-play').textContent = '▶ 播放';
+    document.getElementById('btn-play').classList.remove('playing');
+    return;
+  }
+  const speed = parseFloat(document.getElementById('speed-slider').value) || 1.5;
+  const totalDur = 3.5 / speed;
+  // If already at end, reverse; if paused mid-way, resume forward
+  const startT = window._foldState.t;
+  const targetT = startT >= 0.99 ? 0 : 1;
+  const dur = totalDur * Math.abs(targetT - startT);
+  document.getElementById('btn-play').textContent = '⏸ 暫停';
+  document.getElementById('btn-play').classList.add('playing');
+  _foldTween = gsap.to(window._foldState, {
+    t: targetT,
+    duration: dur,
+    ease: 'none',  // easing handled inside _applyFoldAngle per phase
+    onUpdate: () => setFoldProgress(window._foldState.t),
+    onComplete: () => {
+      document.getElementById('btn-play').textContent = '▶ 播放';
+      document.getElementById('btn-play').classList.remove('playing');
+      _foldTween = null;
+    }
+  });
+}
+
+function resetFoldAnim() {
+  if (_foldTween) { _foldTween.kill(); _foldTween = null; }
+  document.getElementById('btn-play').textContent = '▶ 播放';
+  document.getElementById('btn-play').classList.remove('playing');
+  setFoldProgress(0);
+}
+
+function toggleAutoSpin() {
+  _autoSpinActive = !_autoSpinActive;
+  document.getElementById('btn-autospin').classList.toggle('playing', _autoSpinActive);
+}
+
+// ============================================================
+// CARDBOARD COLORS
+// ============================================================
+const CARDBOARD_COLORS = [
+  { hex: '#D4A574', v: 0xD4A574 },
+  { hex: '#F5EED6', v: 0xF5EED6 },
+  { hex: '#C8A84B', v: 0xC8A84B },
+  { hex: '#AAAAAA', v: 0xAAAAAA },
+  { hex: '#8B6347', v: 0x8B6347 },
+  { hex: '#DDDDDD', v: 0xDDDDDD },
+  { hex: '#4A7C59', v: 0x4A7C59 },
+  { hex: '#C0392B', v: 0xC0392B },
+];
+let _activeColorIdx = 0;
+
+function initColorSwatches() {
+  const container = document.getElementById('color-swatches');
+  CARDBOARD_COLORS.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'swatch' + (i === 0 ? ' active' : '');
+    el.style.background = c.hex;
+    el.title = c.hex;
+    el.onclick = () => setCardboardColor(i);
+    container.appendChild(el);
+  });
+}
+
+function setCardboardColor(idx) {
+  _activeColorIdx = idx;
+  document.querySelectorAll('.swatch').forEach((el, i) =>
+    el.classList.toggle('active', i === idx));
+  const col = new THREE.Color(CARDBOARD_COLORS[idx].v);
+  CARDBOARD.color.set(col);
+  CARDBOARD_EDGE.color.set(col.clone().multiplyScalar(0.82));
+}
+
+// ============================================================
+// LIGHT CONTROL
+// ============================================================
+let _ambLight = null, _dirLight = null;
+
+function updateLights() {
+  const ambVal = parseFloat(document.getElementById('light-amb').value);
+  const dirVal = parseFloat(document.getElementById('light-dir').value);
+  if (_ambLight) _ambLight.intensity = ambVal;
+  if (_dirLight) _dirLight.intensity = dirVal;
+}
+
 const CARDBOARD = new THREE.MeshLambertMaterial({ color: 0xD4A574, side: THREE.DoubleSide });
 const CARDBOARD_EDGE = new THREE.MeshLambertMaterial({ color: 0xB8895A, side: THREE.DoubleSide });
 
@@ -715,44 +911,102 @@ function addPanel(parent, w, h, x, y, z, rx, ry, rz) {
   return m;
 }
 
-// 0201 3D - assembled box (open top)
+// 0201 3D - assembled box with animated fold flaps
 function build0201_3D(L, W, H, CAL, scene) {
+  const T = 4;  // board thickness (visual)
+  const flapDepth = Math.round(H / 2); // depth of each flap (H/2)
   const group = new THREE.Group();
-  const T = 2; // thickness in 3D
-  // Bottom
-  const bottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), CARDBOARD);
-  bottom.rotation.x = Math.PI / 2;
-  bottom.position.y = 0;
-  group.add(bottom);
-  // Front (L face)
-  const front = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), CARDBOARD);
-  front.position.set(0, H / 2, W / 2);
-  group.add(front);
-  // Back
-  const back = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), CARDBOARD);
-  back.position.set(0, H / 2, -W / 2);
-  group.add(back);
-  // Left (W face)
-  const left = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), CARDBOARD);
-  left.rotation.y = Math.PI / 2;
-  left.position.set(-L / 2, H / 2, 0);
-  group.add(left);
-  // Right
-  const right = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), CARDBOARD);
-  right.rotation.y = Math.PI / 2;
-  right.position.set(L / 2, H / 2, 0);
-  group.add(right);
-  // Bottom flaps (closed)
-  const flapLen = Math.round(W / 2);
-  const flapH = Math.round(H / 2);
-  // Front bottom flap
-  const bf1 = new THREE.Mesh(new THREE.BoxGeometry(L, flapLen, T), CARDBOARD_EDGE);
-  bf1.rotation.x = Math.PI / 2;
-  bf1.position.set(0, T, W / 2 - flapLen / 2);
-  // Don't add flaps to keep it simple / open top look
-  group.position.y = H / 2;
   group.userData.isBoxModel = true;
+
+  const mat = CARDBOARD;
+  const matFlap = CARDBOARD_EDGE;
+
+  // ---- BOTTOM (closed) ----
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), mat);
+  bottom.rotation.x = Math.PI / 2;
+  group.add(bottom);
+
+  // ---- 4 SIDE WALLS ----
+  // Front (z = +W/2)
+  group.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat),
+    { position: new THREE.Vector3(0, H/2, W/2) }));
+  // Back (z = -W/2)
+  group.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat),
+    { position: new THREE.Vector3(0, H/2, -W/2) }));
+  // Left (x = -L/2)
+  const lwall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mat);
+  lwall.rotation.y = Math.PI/2; lwall.position.set(-L/2, H/2, 0);
+  group.add(lwall);
+  // Right (x = +L/2)
+  const rwall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mat);
+  rwall.rotation.y = Math.PI/2; rwall.position.set(L/2, H/2, 0);
+  group.add(rwall);
+
+  // ---- BOTTOM FLAPS (closed, flat) ----
+  // Minor bottom flaps (left/right panels)
+  const bmFlap = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), mat);
+  bmFlap.position.set(-L/2 + flapDepth/2, 0, 0);
+  group.add(bmFlap);
+  const bmFlapR = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), mat);
+  bmFlapR.position.set(L/2 - flapDepth/2, 0, 0);
+  group.add(bmFlapR);
+  // Major bottom flaps (front/back panels, on top of minor flaps)
+  const bMajF = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), mat);
+  bMajF.position.set(0, T, W/2 - flapDepth/2);
+  group.add(bMajF);
+  const bMajB = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), mat);
+  bMajB.position.set(0, T, -W/2 + flapDepth/2);
+  group.add(bMajB);
+
+  // ---- TOP FLAPS via pivot groups ----
+  // Convention:
+  //   open  = rotation.* = Math.PI  (flap points outward)
+  //   closed = rotation.* = 0       (flap lays horizontal inside box)
+
+  // FRONT top flap  — hinge along X at (0, H, W/2), rotates around X
+  const ftPivot = new THREE.Group();
+  ftPivot.position.set(0, H, W/2);
+  const ftMesh = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), matFlap);
+  ftMesh.position.set(0, 0, -flapDepth/2);  // extends inward (-Z) when closed
+  ftPivot.add(ftMesh);
+  ftPivot.rotation.x = Math.PI;  // start open
+  group.add(ftPivot);
+
+  // BACK top flap — hinge along X at (0, H, -W/2)
+  const btPivot = new THREE.Group();
+  btPivot.position.set(0, H, -W/2);
+  const btMesh = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), matFlap);
+  btMesh.position.set(0, 0, flapDepth/2);   // extends inward (+Z) when closed
+  btPivot.add(btMesh);
+  btPivot.rotation.x = Math.PI;  // start open
+  group.add(btPivot);
+
+  // LEFT top flap — hinge along Z at (-L/2, H, 0), rotates around Z
+  const ltPivot = new THREE.Group();
+  ltPivot.position.set(-L/2, H, 0);
+  const ltMesh = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), matFlap);
+  ltMesh.position.set(flapDepth/2, 0, 0);   // extends inward (+X) when closed
+  ltPivot.add(ltMesh);
+  ltPivot.rotation.z = Math.PI;  // start open
+  group.add(ltPivot);
+
+  // RIGHT top flap — hinge along Z at (L/2, H, 0)
+  const rtPivot = new THREE.Group();
+  rtPivot.position.set(L/2, H, 0);
+  const rtMesh = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), matFlap);
+  rtMesh.position.set(-flapDepth/2, 0, 0);  // extends inward (-X) when closed
+  rtPivot.add(rtMesh);
+  rtPivot.rotation.z = Math.PI;  // start open
+  group.add(rtPivot);
+
+  group.position.y = H / 2;
   scene.add(group);
+
+  // Store pivot refs & current progress for animation
+  window._flapPivots = { front: ftPivot, back: btPivot, left: ltPivot, right: rtPivot };
+  window._foldState = window._foldState || { t: 0 };
+  // Apply current fold state to newly built box
+  _applyFoldAngle(window._foldState.t);
 }
 
 // 0300 3D - tray assembled
@@ -1169,6 +1423,9 @@ window.addEventListener('DOMContentLoaded', () => {
     resizeRenderer();
     if (currentView === 'svg') renderSVG();
   });
+
+  // Init color swatches
+  initColorSwatches();
 
   // Init Three.js
   initThree();

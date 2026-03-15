@@ -416,7 +416,8 @@ function updateAll() {
   if (_foldTween) { _foldTween.kill(); _foldTween = null; }
   const btnPlay = document.getElementById('btn-play');
   if (btnPlay) { btnPlay.textContent = '▶ 播放'; btnPlay.classList.remove('playing'); }
-  window._flapPivots = null;  // cleared; will be repopulated by build0201_3D
+  window._flapPivots = null;
+  window._wallPivots = null;  // cleared; repopulated by build0201_3D
 
   const { L, W, H, CAL } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
@@ -788,17 +789,38 @@ function _eio(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
 
 function _applyFoldAngle(t) {
   const p = window._flapPivots;
-  if (!p) return;
-  // Phase 1 (0→0.45): minor flaps (left/right) close
-  const t1 = _eio(Math.min(t / 0.45, 1));
-  // Phase 2 (0.45→1): major flaps (front/back) close
-  const t2 = _eio(Math.max((t - 0.45) / 0.55, 0));
-  const minorAngle = Math.PI * (1 - t1);
-  const majorAngle = Math.PI * (1 - t2);
-  p.left.rotation.z  = minorAngle;
-  p.right.rotation.z = minorAngle;
-  p.front.rotation.x = majorAngle;
-  p.back.rotation.x  = majorAngle;
+  const w = window._wallPivots;
+  if (!p || !w) return;
+
+  // ── PHASE 1 (t: 0 → 0.5)  Walls erect from flat ──────────────────────────
+  // Front/back pivot around X; left/right pivot around Z.
+  // Flat angles: front=+π/2, back=-π/2, left=+π/2, right=-π/2
+  const e1 = _eio(Math.min(t / 0.5, 1));
+  w.front.rotation.x = (Math.PI / 2) * (1 - e1);
+  w.back.rotation.x  = (-Math.PI / 2) * (1 - e1);
+  w.left.rotation.z  = (Math.PI / 2) * (1 - e1);
+  w.right.rotation.z = (-Math.PI / 2) * (1 - e1);
+
+  // Flaps spread to "pointing straight up" (π/2) during t: 0.2 → 0.5
+  const flapOpen = _eio(Math.max(0, Math.min((t - 0.2) / 0.3, 1)));
+  const maxOpen  = t >= 0.5 ? 1 : flapOpen;  // hold at 1 once fully opened
+
+  // ── PHASE 2  Flaps close ─────────────────────────────────────────────────
+  // Minor (left/right): t: 0.5 → 0.75
+  const tMinor = _eio(Math.max(0, Math.min((t - 0.5) / 0.25, 1)));
+  // Major (front/back): t: 0.65 → 1.0
+  const tMajor = _eio(Math.max(0, Math.min((t - 0.65) / 0.35, 1)));
+
+  // Each flap: from "pointing up" (their respective ±π/2) to 0 (closed).
+  // Verified directions:
+  //   frontFlap mesh at (0,0,-fd/2) → rotation.x=+π/2 → world UP ✓ → 0=closed ✓
+  //   backFlap  mesh at (0,0,+fd/2) → rotation.x=-π/2 → world UP ✓ → 0=closed ✓
+  //   leftFlap  mesh at (fd/2,0,0)  → rotation.z=+π/2 → world UP ✓ → 0=closed ✓
+  //   rightFlap mesh at (-fd/2,0,0) → rotation.z=-π/2 → world UP ✓ → 0=closed ✓
+  p.front.rotation.x = (Math.PI / 2)  * maxOpen * (1 - tMajor);
+  p.back.rotation.x  = (-Math.PI / 2) * maxOpen * (1 - tMajor);
+  p.left.rotation.z  = (Math.PI / 2)  * maxOpen * (1 - tMinor);
+  p.right.rotation.z = (-Math.PI / 2) * maxOpen * (1 - tMinor);
 }
 
 function setFoldProgress(t) {
@@ -925,103 +947,108 @@ function addPanel(parent, w, h, x, y, z, rx, ry, rz) {
   return m;
 }
 
-// 0201 3D - assembled box with animated fold flaps
+// 0201 3D — hierarchical wall+flap pivot structure for fold animation.
+//
+// Coordinate system (group origin = centre of box bottom face):
+//   +Z = front,  +X = right,  +Y = up
+//
+// Each WALL has a pivot group at its bottom edge (y=0).
+//   flat angle : front=+π/2  back=-π/2  left=+π/2  right=-π/2
+//   erected    : 0 (all pivots)
+//
+// Each FLAP is a child of its wall pivot, with its own sub-pivot at
+// the wall's top edge (local y=H).
+//   open  (pointing straight up in wall-local space): front=+π/2, back=-π/2,
+//                                                      left=+π/2, right=-π/2
+//   closed (flat inside box): 0 (all flap pivots)
 function build0201_3D(L, W, H, CAL, scene) {
-  const T = 4;  // board thickness (visual)
-  const flapDepth = Math.round(H / 2); // depth of each flap (H/2)
+  const T  = 4;
+  const fd = Math.round(H / 2);   // flap depth = H/2
+  const mat  = CARDBOARD;
+  const matF = CARDBOARD_EDGE;
+
   const group = new THREE.Group();
   group.userData.isBoxModel = true;
 
-  const mat = CARDBOARD;
-  const matFlap = CARDBOARD_EDGE;
-
-  // ---- BOTTOM (closed) ----
+  // ── BOTTOM (static, always closed) ──────────────────────────────────────
   const bottom = new THREE.Mesh(new THREE.BoxGeometry(L, W, T), mat);
   bottom.rotation.x = Math.PI / 2;
   group.add(bottom);
+  // Closed bottom flaps (minor then major, stacked)
+  [[-L/2 + fd/2, 0, 0], [L/2 - fd/2, 0, 0]].forEach(([x,y,z]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(fd, T, W - T*2), mat);
+    m.position.set(x, y, z); group.add(m);
+  });
+  [0, 1].forEach(side => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, fd), mat);
+    m.position.set(0, T, (W/2 - fd/2) * (side === 0 ? 1 : -1)); group.add(m);
+  });
 
-  // ---- 4 SIDE WALLS ----
-  // Front (z = +W/2)
-  const fwall = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat);
-  fwall.position.set(0, H/2, W/2);
-  group.add(fwall);
-  // Back (z = -W/2)
-  const bwall = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), mat);
-  bwall.position.set(0, H/2, -W/2);
-  group.add(bwall);
-  // Left (x = -L/2)
-  const lwall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mat);
-  lwall.rotation.y = Math.PI/2; lwall.position.set(-L/2, H/2, 0);
-  group.add(lwall);
-  // Right (x = +L/2)
-  const rwall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mat);
-  rwall.rotation.y = Math.PI/2; rwall.position.set(L/2, H/2, 0);
-  group.add(rwall);
+  // ── WALL PIVOT HELPER ────────────────────────────────────────────────────
+  // Returns { wallPivot, flapPivot }.
+  // wallGeo = BoxGeometry for the wall mesh (pre-oriented for local space).
+  // flapGeo = BoxGeometry for the top flap.
+  // flapLocalPos = flap mesh local position in flapPivot space.
+  // pivotWorldPos = where in group space this wall's bottom edge is.
+  function makeWallWithFlap(wallGeo, flapGeo, flapLocalPos, pivotWorldPos) {
+    // Wall pivot (bottom edge)
+    const wp = new THREE.Group();
+    wp.position.set(...pivotWorldPos);
 
-  // ---- BOTTOM FLAPS (closed, flat) ----
-  // Minor bottom flaps (left/right panels)
-  const bmFlap = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), mat);
-  bmFlap.position.set(-L/2 + flapDepth/2, 0, 0);
-  group.add(bmFlap);
-  const bmFlapR = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), mat);
-  bmFlapR.position.set(L/2 - flapDepth/2, 0, 0);
-  group.add(bmFlapR);
-  // Major bottom flaps (front/back panels, on top of minor flaps)
-  const bMajF = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), mat);
-  bMajF.position.set(0, T, W/2 - flapDepth/2);
-  group.add(bMajF);
-  const bMajB = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), mat);
-  bMajB.position.set(0, T, -W/2 + flapDepth/2);
-  group.add(bMajB);
+    // Wall mesh: local position = centre of the panel above hinge
+    const wm = new THREE.Mesh(wallGeo, mat);
+    wm.position.set(0, wallGeo.parameters.height / 2, 0);
+    wp.add(wm);
 
-  // ---- TOP FLAPS via pivot groups ----
-  // Convention:
-  //   open  = rotation.* = Math.PI  (flap points outward)
-  //   closed = rotation.* = 0       (flap lays horizontal inside box)
+    // Flap sub-pivot at the wall's top edge
+    const fp = new THREE.Group();
+    fp.position.set(0, wallGeo.parameters.height, 0);
+    const fm = new THREE.Mesh(flapGeo, matF);
+    fm.position.set(...flapLocalPos);
+    fp.add(fm);
+    wp.add(fp);
 
-  // FRONT top flap  — hinge along X at (0, H, W/2), rotates around X
-  const ftPivot = new THREE.Group();
-  ftPivot.position.set(0, H, W/2);
-  const ftMesh = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), matFlap);
-  ftMesh.position.set(0, 0, -flapDepth/2);  // extends inward (-Z) when closed
-  ftPivot.add(ftMesh);
-  ftPivot.rotation.x = Math.PI;  // start open
-  group.add(ftPivot);
+    group.add(wp);
+    return { wp, fp };
+  }
 
-  // BACK top flap — hinge along X at (0, H, -W/2)
-  const btPivot = new THREE.Group();
-  btPivot.position.set(0, H, -W/2);
-  const btMesh = new THREE.Mesh(new THREE.BoxGeometry(L - T*2, T, flapDepth), matFlap);
-  btMesh.position.set(0, 0, flapDepth/2);   // extends inward (+Z) when closed
-  btPivot.add(btMesh);
-  btPivot.rotation.x = Math.PI;  // start open
-  group.add(btPivot);
+  // Front wall: L×H panel, hinge at (0,0,+W/2)
+  //   flapMesh at (0,0,-fd/2) → closed=horizontal-inside when flapPivot.x=0
+  const { wp: wpFront, fp: fpFront } = makeWallWithFlap(
+    new THREE.BoxGeometry(L, H, T),
+    new THREE.BoxGeometry(L - T*2, T, fd), [0, 0, -fd/2],
+    [0, 0, W/2]
+  );
 
-  // LEFT top flap — hinge along Z at (-L/2, H, 0), rotates around Z
-  const ltPivot = new THREE.Group();
-  ltPivot.position.set(-L/2, H, 0);
-  const ltMesh = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), matFlap);
-  ltMesh.position.set(flapDepth/2, 0, 0);   // extends inward (+X) when closed
-  ltPivot.add(ltMesh);
-  ltPivot.rotation.z = Math.PI;  // start open
-  group.add(ltPivot);
+  // Back wall: L×H panel, hinge at (0,0,-W/2)
+  //   flapMesh at (0,0,+fd/2) → closed when flapPivot.x=0
+  const { wp: wpBack, fp: fpBack } = makeWallWithFlap(
+    new THREE.BoxGeometry(L, H, T),
+    new THREE.BoxGeometry(L - T*2, T, fd), [0, 0, fd/2],
+    [0, 0, -W/2]
+  );
 
-  // RIGHT top flap — hinge along Z at (L/2, H, 0)
-  const rtPivot = new THREE.Group();
-  rtPivot.position.set(L/2, H, 0);
-  const rtMesh = new THREE.Mesh(new THREE.BoxGeometry(flapDepth, T, W - T*2), matFlap);
-  rtMesh.position.set(-flapDepth/2, 0, 0);  // extends inward (-X) when closed
-  rtPivot.add(rtMesh);
-  rtPivot.rotation.z = Math.PI;  // start open
-  group.add(rtPivot);
+  // Left wall: T×H×W panel (natural Z-span), hinge at (-L/2,0,0)
+  //   flapMesh at (+fd/2,0,0) → closed when flapPivot.z=0
+  const { wp: wpLeft, fp: fpLeft } = makeWallWithFlap(
+    new THREE.BoxGeometry(T, H, W),
+    new THREE.BoxGeometry(fd, T, W - T*2), [fd/2, 0, 0],
+    [-L/2, 0, 0]
+  );
 
-  group.position.y = H / 2;
+  // Right wall: T×H×W panel, hinge at (+L/2,0,0)
+  //   flapMesh at (-fd/2,0,0) → closed when flapPivot.z=0
+  const { wp: wpRight, fp: fpRight } = makeWallWithFlap(
+    new THREE.BoxGeometry(T, H, W),
+    new THREE.BoxGeometry(fd, T, W - T*2), [-fd/2, 0, 0],
+    [L/2, 0, 0]
+  );
+
   scene.add(group);
 
-  // Store pivot refs & current progress for animation
-  window._flapPivots = { front: ftPivot, back: btPivot, left: ltPivot, right: rtPivot };
-  window._foldState = window._foldState || { t: 0 };
-  // Apply current fold state to newly built box
+  window._wallPivots = { front: wpFront, back: wpBack, left: wpLeft, right: wpRight };
+  window._flapPivots = { front: fpFront, back: fpBack, left: fpLeft, right: fpRight };
+  window._foldState  = window._foldState || { t: 0 };
   _applyFoldAngle(window._foldState.t);
 }
 

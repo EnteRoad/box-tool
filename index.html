@@ -946,34 +946,36 @@ function _applyFoldAngle(t) {
   if (!p || !w) return;
 
   // ── PHASE 1 (t: 0 → 0.5)  Walls erect from flat ──────────────────────────
-  // Front/back pivot around X; left/right pivot around Z.
-  // Flat angles: front=+π/2, back=-π/2, left=+π/2, right=-π/2
   const e1 = _eio(Math.min(t / 0.5, 1));
   w.front.rotation.x = (Math.PI / 2) * (1 - e1);
   w.back.rotation.x  = (-Math.PI / 2) * (1 - e1);
   w.left.rotation.z  = (Math.PI / 2) * (1 - e1);
   w.right.rotation.z = (-Math.PI / 2) * (1 - e1);
 
-  // Flaps spread to "pointing straight up" (π/2) during t: 0.2 → 0.5
-  const flapOpen = _eio(Math.max(0, Math.min((t - 0.2) / 0.3, 1)));
-  const maxOpen  = t >= 0.5 ? 1 : flapOpen;  // hold at 1 once fully opened
+  // Flaps spread from 0 (flat with wall) → π (pointing OUTWARD horizontally)
+  // during t: 0.1 → 0.5  — this gives the "wings spread wide" look as walls erect
+  const flapOpenE = _eio(Math.max(0, Math.min((t - 0.1) / 0.4, 1)));
+  const maxOpen   = t >= 0.5 ? 1 : flapOpenE;  // hold at 1 after walls fully erected
 
-  // ── PHASE 2  Flaps close ─────────────────────────────────────────────────
-  // Minor (left/right): t: 0.5 → 0.75
-  const tMinor = _eio(Math.max(0, Math.min((t - 0.5) / 0.25, 1)));
-  // Major (front/back): t: 0.65 → 1.0
-  const tMajor = _eio(Math.max(0, Math.min((t - 0.65) / 0.35, 1)));
+  // ── PHASE 2  Flaps close: outward(π) → up(π/2) → closed(0) ───────────────
+  //
+  // Verified rotation math (mesh position in flapPivot local space):
+  //   frontFlap mesh at (0,0,-fd/2): rotation.x= π →OUTWARD, π/2→UP, 0→CLOSED ✓
+  //   backFlap  mesh at (0,0,+fd/2): rotation.x=-π →OUTWARD,-π/2→UP, 0→CLOSED ✓
+  //   leftFlap  mesh at (fd/2,0,0) : rotation.z= π →OUTWARD, π/2→UP, 0→CLOSED ✓
+  //   rightFlap mesh at (-fd/2,0,0): rotation.z=-π →OUTWARD,-π/2→UP, 0→CLOSED ✓
+  //
+  // Going from ±π → 0 naturally passes through ±π/2 (UP), which is correct RSC fold.
+  //
+  // Minor flaps (left/right) close first: t: 0.5 → 0.78
+  const tMinor = _eio(Math.max(0, Math.min((t - 0.5) / 0.28, 1)));
+  // Major flaps (front/back) close after: t: 0.64 → 1.0
+  const tMajor = _eio(Math.max(0, Math.min((t - 0.64) / 0.36, 1)));
 
-  // Each flap: from "pointing up" (their respective ±π/2) to 0 (closed).
-  // Verified directions:
-  //   frontFlap mesh at (0,0,-fd/2) → rotation.x=+π/2 → world UP ✓ → 0=closed ✓
-  //   backFlap  mesh at (0,0,+fd/2) → rotation.x=-π/2 → world UP ✓ → 0=closed ✓
-  //   leftFlap  mesh at (fd/2,0,0)  → rotation.z=+π/2 → world UP ✓ → 0=closed ✓
-  //   rightFlap mesh at (-fd/2,0,0) → rotation.z=-π/2 → world UP ✓ → 0=closed ✓
-  p.front.rotation.x = (Math.PI / 2)  * maxOpen * (1 - tMajor);
-  p.back.rotation.x  = (-Math.PI / 2) * maxOpen * (1 - tMajor);
-  p.left.rotation.z  = (Math.PI / 2)  * maxOpen * (1 - tMinor);
-  p.right.rotation.z = (-Math.PI / 2) * maxOpen * (1 - tMinor);
+  p.front.rotation.x =  Math.PI * maxOpen * (1 - tMajor);
+  p.back.rotation.x  = -Math.PI * maxOpen * (1 - tMajor);
+  p.left.rotation.z  =  Math.PI * maxOpen * (1 - tMinor);
+  p.right.rotation.z = -Math.PI * maxOpen * (1 - tMinor);
 }
 
 // ============================================================
@@ -1178,19 +1180,47 @@ function build0201_3D(L, W, H, CAL, scene) {
   // flapGeo = BoxGeometry for the top flap.
   // flapLocalPos = flap mesh local position in flapPivot space.
   // pivotWorldPos = where in group space this wall's bottom edge is.
+  // Score-line material (dark, thin lines showing fold creases)
+  const scoreMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
+
   function makeWallWithFlap(wallGeo, flapGeo, flapLocalPos, pivotWorldPos) {
+    const wallW = wallGeo.parameters.width;   // X span of wall mesh
+    const wallH = wallGeo.parameters.height;  // Y span
+    const wallD = wallGeo.parameters.depth;   // Z span (= T for front/back, W for left/right)
+
     // Wall pivot (bottom edge)
     const wp = new THREE.Group();
     wp.position.set(...pivotWorldPos);
 
     // Wall mesh: local position = centre of the panel above hinge
     const wm = new THREE.Mesh(wallGeo, mat);
-    wm.position.set(0, wallGeo.parameters.height / 2, 0);
+    wm.position.set(0, wallH / 2, 0);
     wp.add(wm);
+
+    // Score lines on OUTER face at y=0 (bottom hinge) and y=wallH (top hinge)
+    // Outer face of wall mesh is at local z = +wallD/2 (for front/back panels)
+    // or at local x = -wallW/2 (for left/right panels, where wallW=T).
+    // We place lines on z = +wallD/2 + 0.5 (just proud of surface).
+    const zOuter = wallD / 2 + 0.5;
+    const halfSpan = wallW / 2;   // half of the horizontal extent
+    // Bottom score line (y=0, bottom of wall = fold hinge to bottom flap)
+    const ptsBtm = [
+      new THREE.Vector3(-halfSpan, 0, zOuter),
+      new THREE.Vector3( halfSpan, 0, zOuter),
+    ];
+    // Top score line (y=wallH, fold hinge to top flap)
+    const ptsTop = [
+      new THREE.Vector3(-halfSpan, wallH, zOuter),
+      new THREE.Vector3( halfSpan, wallH, zOuter),
+    ];
+    [ptsBtm, ptsTop].forEach(pts => {
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      wp.add(new THREE.Line(geo, scoreMat));
+    });
 
     // Flap sub-pivot at the wall's top edge
     const fp = new THREE.Group();
-    fp.position.set(0, wallGeo.parameters.height, 0);
+    fp.position.set(0, wallH, 0);
     const fm = new THREE.Mesh(flapGeo, matF);
     fm.position.set(...flapLocalPos);
     fp.add(fm);

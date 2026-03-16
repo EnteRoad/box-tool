@@ -118,6 +118,36 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
 
 /* Notification */
 #notify{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:5px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:9999}
+
+/* ── Parameter table ─────────────────────────────────────── */
+.pt-top-ctrl{display:flex;align-items:center;gap:5px;margin-bottom:7px}
+.pt-top-label{font-size:11px;color:#555;white-space:nowrap;flex-shrink:0}
+.pt-select{height:26px;border:1px solid #ddd;border-radius:4px;font-size:11px;padding:0 4px;background:#fff;cursor:pointer;color:#333;outline:none}
+.pt-number{height:26px;border:1px solid #ddd;border-radius:4px;padding:0 5px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#222;outline:none;transition:border 0.15s;width:70px}
+.pt-number:focus{border-color:#4361EE}
+.pt-hdr{display:flex;align-items:center;border-bottom:1px solid #e0e0e0;padding-bottom:4px;margin-bottom:3px}
+.pt-hdr-layer,.pt-hdr-code,.pt-hdr-desc,.pt-hdr-val{font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.4px}
+.pt-hdr-layer{width:18px;text-align:center;flex-shrink:0}
+.pt-hdr-code{width:34px;margin-left:2px;flex-shrink:0}
+.pt-hdr-desc{flex:1}
+.pt-hdr-val{width:74px;text-align:right}
+.pt-row{display:flex;align-items:center;padding:3px 2px;border-radius:3px;cursor:default;transition:background 0.12s}
+.pt-row:hover{background:#f5f7ff}
+.pt-row.flash{background:#ff6b00;transition:none}
+.pt-layer{width:18px;font-size:10px;color:#ccc;text-align:center;flex-shrink:0}
+.pt-code{width:34px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:#4361EE;font-weight:500;flex-shrink:0;margin-left:2px}
+.pt-desc{flex:1;font-size:11px;color:#555}
+.pt-val{width:74px;flex-shrink:0}
+.pt-val input{width:100%;height:24px;border:1px solid #ddd;border-radius:3px;padding:0 5px;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;outline:none;transition:border 0.15s;background:#fff;color:#222}
+.pt-val input:focus{border-color:#4361EE}
+.pt-val input[readonly]{background:#f5f5f5;color:#888;border-color:#eee;cursor:default}
+.pt-row.flash .pt-layer,.pt-row.flash .pt-code,.pt-row.flash .pt-desc{color:#fff}
+.pt-row.flash .pt-val input{background:#ff8c1a;color:#fff;border-color:#ff8c1a}
+.pt-sep{height:1px;background:#f0f0f0;margin:3px 0}
+.pt-detail{overflow:hidden;max-height:800px;transition:max-height 0.25s ease}
+.pt-detail.hidden{max-height:0}
+.toggle-detail-btn{font-size:10px;color:#4361EE;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;flex-shrink:0}
+.toggle-detail-btn:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -160,16 +190,95 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
     <!-- Right panel -->
     <div id="right-panel">
       <div id="panel-inner">
-        <div class="section-title">尺寸輸入 (mm)</div>
-        <div class="input-row"><label>L</label><input type="number" id="inp-L" value="300" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
-        <div class="input-row"><label>W</label><input type="number" id="inp-W" value="200" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
-        <div class="input-row"><label>H</label><input type="number" id="inp-H" value="150" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
-        <div class="input-row"><label>CAL</label><input type="number" id="inp-CAL" value="3" min="0" max="20" step="0.5" onkeydown="if(event.key==='Enter')submitDims()"><span>mm</span></div>
-        <button id="btn-submit" class="export-btn primary" style="margin-top:4px" onclick="submitDims()">生成</button>
+        <!-- 尺寸類型 -->
+        <div class="pt-top-ctrl">
+          <span class="pt-top-label">尺寸類型</span>
+          <select id="dim-type" class="pt-select" style="flex:1">
+            <option value="inner">內尺寸</option>
+            <option value="die" selected>刀模尺寸</option>
+            <option value="outer">外尺寸</option>
+          </select>
+        </div>
+        <!-- 紙厚 -->
+        <div class="pt-top-ctrl">
+          <span class="pt-top-label">紙厚 (0.01–20)</span>
+          <input type="number" id="inp-t" value="3" min="0.01" max="20" step="0.1" class="pt-number" onkeydown="if(event.key==='Enter')submitDims()">
+          <select class="pt-select" style="width:42px"><option>mm</option></select>
+        </div>
+        <!-- 主尺寸單位 + 切換細節 -->
+        <div class="pt-top-ctrl" style="justify-content:space-between">
+          <div class="pt-top-ctrl" style="margin:0">
+            <span class="pt-top-label">主尺寸單位</span>
+            <select class="pt-select" style="width:52px"><option>mm</option></select>
+          </div>
+          <button class="toggle-detail-btn" id="btn-toggle-detail" onclick="toggleDetailParams()">隱藏細節參數</button>
+        </div>
 
-        <hr class="divider">
-        <div class="section-title">計算結果</div>
-        <div id="calc-results"></div>
+        <!-- Table header -->
+        <div class="pt-hdr">
+          <span class="pt-hdr-layer">層</span>
+          <span class="pt-hdr-code">代號</span>
+          <span class="pt-hdr-desc">描述</span>
+          <span class="pt-hdr-val">值</span>
+        </div>
+
+        <!-- Layer 1: main dims (always visible) -->
+        <div class="pt-row" id="pr-L" data-param="L">
+          <span class="pt-layer">1</span><span class="pt-code">L</span>
+          <span class="pt-desc">長</span>
+          <span class="pt-val"><input type="number" id="inp-L" value="300" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"></span>
+        </div>
+        <div class="pt-row" id="pr-W" data-param="W">
+          <span class="pt-layer">1</span><span class="pt-code">W</span>
+          <span class="pt-desc">寬</span>
+          <span class="pt-val"><input type="number" id="inp-W" value="200" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"></span>
+        </div>
+        <div class="pt-row" id="pr-D" data-param="D">
+          <span class="pt-layer">1</span><span class="pt-code">D</span>
+          <span class="pt-desc">高</span>
+          <span class="pt-val"><input type="number" id="inp-H" value="150" min="10" max="5000" onkeydown="if(event.key==='Enter')submitDims()"></span>
+        </div>
+
+        <div class="pt-sep"></div>
+
+        <!-- Detail params (layers 2+, toggleable) -->
+        <div class="pt-detail" id="pt-detail-section">
+          <div class="pt-row" id="pr-of" data-param="of">
+            <span class="pt-layer">2</span><span class="pt-code">of</span>
+            <span class="pt-desc">高低位</span>
+            <span class="pt-val"><input type="number" id="inp-of" value="1" min="0" max="20" step="0.5" onkeydown="if(event.key==='Enter')submitDims()"></span>
+          </div>
+          <div class="pt-row" id="pr-g" data-param="g">
+            <span class="pt-layer">2</span><span class="pt-code">g</span>
+            <span class="pt-desc">黏位長</span>
+            <span class="pt-val"><input type="number" id="inp-g" value="30" min="5" max="100" onkeydown="if(event.key==='Enter')submitDims()"></span>
+          </div>
+          <div class="pt-sep"></div>
+          <div class="pt-row" id="pr-f" data-param="f">
+            <span class="pt-layer">3</span><span class="pt-code">f</span>
+            <span class="pt-desc">翼深 (0=自動)</span>
+            <span class="pt-val"><input type="number" id="inp-f" value="0" min="0" max="500" onkeydown="if(event.key==='Enter')submitDims()"></span>
+          </div>
+          <div class="pt-row" id="pr-sl" data-param="sl">
+            <span class="pt-layer">3</span><span class="pt-code">sl</span>
+            <span class="pt-desc">開槽寬 (0=自動)</span>
+            <span class="pt-val"><input type="number" id="inp-sl" value="0" min="0" max="50" step="0.5" onkeydown="if(event.key==='Enter')submitDims()"></span>
+          </div>
+          <div class="pt-sep"></div>
+          <!-- Calculated read-only outputs -->
+          <div class="pt-row" id="pr-mfgW" data-param="mfgW">
+            <span class="pt-layer">4</span><span class="pt-code">mW</span>
+            <span class="pt-desc">製造寬</span>
+            <span class="pt-val"><input id="out-mfgW" readonly value="—"></span>
+          </div>
+          <div class="pt-row" id="pr-mfgH" data-param="mfgH">
+            <span class="pt-layer">4</span><span class="pt-code">mH</span>
+            <span class="pt-desc">製造高</span>
+            <span class="pt-val"><input id="out-mfgH" readonly value="—"></span>
+          </div>
+        </div>
+
+        <button id="btn-submit" class="export-btn primary" style="margin-top:6px" onclick="submitDims()">調參</button>
 
         <hr class="divider">
         <div class="section-title">3D 折疊動畫</div>
@@ -262,40 +371,50 @@ const BOX_LIBRARY = [
     nameCN: '對插蓋紙箱',
     nameEN: 'Regular Slotted Container',
     desc: '最常見的瓦楞紙箱型，四片側板加上頂底蓋翼。',
-    calc(L, W, H, CAL) {
-      const flapW_inner = Math.floor(W / 2);
-      const flapW_outer = Math.ceil(W / 2);
-      const flapH = Math.round(H / 2);
+    calc(L, W, H, CAL, extra = {}) {
+      const { of: ofVal = 1, gTab = 30, f: fOverride = 0, sl: slOverride = 0 } = extra;
+      // Flap depth: user override or H/2
+      const flapH_auto = Math.round(H / 2);
+      const flapH      = fOverride > 0 ? fOverride : flapH_auto;
+      // Flap widths (minor = floor(W/2) - ofVal, major = ceil(W/2))
+      const flapW_minor = Math.floor(W / 2) - ofVal;   // short-side (B panels), slightly shorter
+      const flapW_major = Math.ceil(W / 2);             // long-side  (A panels)
+      // Slot width between adjacent flaps
+      const slotW = slOverride > 0 ? slOverride : CAL + 2;
+      // Panel dimensions
       const panelA_w = L + CAL;
       const panelA_h = H + 2 * CAL;
       const panelB_w = W + CAL;
-      const panelB_h = H + 2 * CAL;
-      const mfgW = (L + CAL) * 2 + (W + CAL) * 2;
-      const mfgH = H + CAL * 2;
+      // Glue tab
+      const glue = Math.max(gTab, CAL + 5);
+      // Manufacturing blank size
+      const mfgW = panelA_w * 2 + panelB_w * 2 + glue;
+      const mfgH = flapH + panelA_h + flapH;
       const extL = L + 2 * CAL;
       const extW = W + 2 * CAL;
       const extH = H + 2 * CAL;
       return {
-        panelA_w, panelA_h, panelB_w, panelB_h,
-        flapW_inner, flapW_outer, flapH,
+        panelA_w, panelA_h, panelB_w,
+        flapW_minor, flapW_major, flapH, slotW, glue,
+        // keep old names for backward compat
+        flapW_inner: flapW_minor, flapW_outer: flapW_major,
         mfgW, mfgH, extL, extW, extH,
         rows: [
           ['面板 A 寬', panelA_w],
           ['面板 B 寬', panelB_w],
           ['面板高', panelA_h],
-          ['蓋翼長(內)', flapW_inner],
-          ['蓋翼長(外)', flapW_outer],
+          ['蓋翼(A)', flapW_major],
+          ['蓋翼(B)', flapW_minor],
           ['蓋翼高', flapH],
+          ['開槽寬', slotW],
+          ['黏位', glue],
           ['製造寬', mfgW, true],
           ['製造高', mfgH, true],
-          ['外部 L', extL],
-          ['外部 W', extW],
-          ['外部 H', extH],
         ]
       };
     },
-    svgGen(L, W, H, CAL, vw, vh) {
-      return gen0201SVG(L, W, H, CAL, vw, vh);
+    svgGen(L, W, H, CAL, vw, vh, extra) {
+      return gen0201SVG(L, W, H, CAL, vw, vh, extra);
     },
     build3D(L, W, H, CAL, scene) {
       return build0201_3D(L, W, H, CAL, scene);
@@ -388,11 +507,16 @@ let calcData = null;
 // STATE
 // ============================================================
 function getInputs() {
+  const g = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; };
   return {
-    L: parseFloat(document.getElementById('inp-L').value) || 300,
-    W: parseFloat(document.getElementById('inp-W').value) || 200,
-    H: parseFloat(document.getElementById('inp-H').value) || 150,
-    CAL: parseFloat(document.getElementById('inp-CAL').value) || 3
+    L:   g('inp-L')  || 300,
+    W:   g('inp-W')  || 200,
+    H:   g('inp-H')  || 150,
+    CAL: g('inp-t')  || 3,
+    of:  isNaN(g('inp-of'))  ? 1  : (g('inp-of')  || 0),
+    gTab:isNaN(g('inp-g'))   ? 30 : (g('inp-g')   || 30),
+    f:   isNaN(g('inp-f'))   ? 0  : (g('inp-f')   || 0),
+    sl:  isNaN(g('inp-sl'))  ? 0  : (g('inp-sl')  || 0),
   };
 }
 
@@ -419,26 +543,21 @@ function updateAll() {
   window._flapPivots = null;
   window._wallPivots = null;  // cleared; repopulated by build0201_3D
 
-  const { L, W, H, CAL } = getInputs();
+  const { L, W, H, CAL, of: ofVal, gTab, f: fVal, sl: slVal } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
-  calcData = box.calc(L, W, H, CAL);
+  calcData = box.calc(L, W, H, CAL, { of: ofVal, gTab, f: fVal, sl: slVal });
 
-  // Results panel
-  const container = document.getElementById('calc-results');
-  container.innerHTML = '';
-  calcData.rows.forEach(([label, val, hi]) => {
-    const row = document.createElement('div');
-    row.className = 'result-row';
-    row.innerHTML = `<span class="result-label">${label}</span><span class="result-val${hi ? ' highlight' : ''}">${val} mm</span>`;
-    container.appendChild(row);
-  });
+  // Update read-only calc output rows
+  const mfgW = calcData.mfgW || calcData.mfgW_lid || '—';
+  const mfgH = calcData.mfgH || calcData.mfgH_lid || '—';
+  const elMfgW = document.getElementById('out-mfgW');
+  const elMfgH = document.getElementById('out-mfgH');
+  if (elMfgW) elMfgW.value = mfgW;
+  if (elMfgH) elMfgH.value = mfgH;
 
   // Status bar
   document.getElementById('sb-code').textContent = box.code.replace('-', ' ');
   document.getElementById('box-type-label').textContent = box.label;
-
-  const mfgW = calcData.mfgW || calcData.mfgW_base || '—';
-  const mfgH = calcData.mfgH || calcData.mfgH_base || '—';
   document.getElementById('sb-mfg').textContent = `${mfgW} × ${mfgH} mm`;
   document.getElementById('sb-ext').textContent = `${calcData.extL} × ${calcData.extW} × ${calcData.extH} mm`;
 
@@ -454,11 +573,11 @@ function updateAll() {
 // ============================================================
 function renderSVG() {
   const svgArea = document.getElementById('svg-area');
-  const { L, W, H, CAL } = getInputs();
+  const { L, W, H, CAL, of: ofVal, gTab, f: fVal, sl: slVal } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
   const vw = svgArea.clientWidth || 800;
   const vh = svgArea.clientHeight || 600;
-  svgArea.innerHTML = box.svgGen(L, W, H, CAL, vw, vh);
+  svgArea.innerHTML = box.svgGen(L, W, H, CAL, vw, vh, { of: ofVal, gTab, f: fVal, sl: slVal });
 }
 
 // SVG helper: scale flat diagram to viewport
@@ -487,125 +606,159 @@ function svgRect(x, y, w, h, layer) {
   return lines.join('');
 }
 
-function svgDim(x1, y1, x2, y2, label, outside) {
-  // Simple dimension annotation
+// svgDim — dimension annotation, optionally clickable (paramCode links to right-panel row)
+function svgDim(x1, y1, x2, y2, label, outside, paramCode) {
   const mx = (x1+x2)/2, my = (y1+y2)/2;
-  const isH = Math.abs(y2-y1) < 2; // horizontal dim
-  const offset = outside ? -18 : 18;
-  const tx = isH ? mx : mx - (outside ? 30 : -30);
-  const ty = isH ? my - (outside ? 16 : -16) : my;
-  return `<line x1="${r(x1)}" y1="${r(y1)}" x2="${r(x2)}" y2="${r(y2)}" stroke="#aaa" stroke-width="0.7"/>
-  <text x="${r(tx)}" y="${r(ty)}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-family="IBM Plex Mono,monospace" fill="#888">${label}</text>`;
+  const isH = Math.abs(y2-y1) < 2;
+  const tx = isH ? mx : mx - (outside ? 32 : -32);
+  const ty = isH ? my - (outside ? 14 : -14) : my;
+  const fill   = paramCode ? '#4361EE' : '#888';
+  const weight = paramCode ? '600' : '400';
+  const clk    = paramCode
+    ? ` onclick="highlightParam('${paramCode}')" style="cursor:pointer"`
+    : '';
+  const bg = paramCode
+    ? `<rect x="${r(tx-20)}" y="${r(ty-7)}" width="40" height="13" rx="3"
+           fill="rgba(67,97,238,0.08)"
+           onmouseover="this.setAttribute('fill','rgba(67,97,238,0.2)')"
+           onmouseout="this.setAttribute('fill','rgba(67,97,238,0.08)')"/>`
+    : '';
+  return `<line x1="${r(x1)}" y1="${r(y1)}" x2="${r(x2)}" y2="${r(y2)}" stroke="#bbb" stroke-width="0.6"/>
+<g${clk}>${bg}<text x="${r(tx)}" y="${r(ty)}" text-anchor="middle" dominant-baseline="middle"
+  font-size="9" font-family="IBM Plex Mono,monospace" fill="${fill}" font-weight="${weight}">${label}</text></g>`;
 }
 
 function r(n) { return Math.round(n * 10) / 10; }
 
 // ---- FEFCO 0201 SVG ----
-function gen0201SVG(L, W, H, CAL, vw, vh) {
-  const d = BOX_LIBRARY[0].calc(L, W, H, CAL);
-  const { panelA_w, panelA_h, panelB_w, flapW_inner, flapW_outer, flapH } = d;
+function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
+  extra = extra || {};
+  const d = BOX_LIBRARY[0].calc(L, W, H, CAL, extra);
+  const { panelA_w, panelA_h, panelB_w, flapH, flapW_minor, flapW_major, slotW, glue } = d;
 
-  // Layout: [flapOuter | A1 | flapInner] [B1] [A2] [B2] [glue]
-  // Total flat width = flapW_outer + panelA_w + panelB_w + panelA_w + panelB_w + some glue
-  // Total flat height = flapH + panelA_h + flapH (= H + 2*CAL + 2*flapH = H+CAL*2 + H)
-
-  const glue = CAL + 5;
-  const flatW = flapW_outer + panelA_w + panelB_w + panelA_w + panelB_w + glue;
+  // Blank layout (left→right):
+  //  [glue tab] [A1: L+CAL] [B1: W+CAL] [A2: L+CAL] [B2: W+CAL]
+  // Flap zone top + bottom = flapH each
+  // The first column (glue) sits to the LEFT of A1.
+  const flatW = glue + panelA_w + panelB_w + panelA_w + panelB_w;
   const flatH = flapH + panelA_h + flapH;
 
-  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 70);
-  const s = v => v * scale;
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 80);
+  const s  = v => v * scale;
   const tx = v => ox + v * scale;
   const ty = v => oy + v * scale;
 
-  let cuts = '', folds = '';
+  // X column boundaries (mm, unscaled)
+  const xGlue = 0;
+  const xA1   = glue;
+  const xB1   = xA1 + panelA_w;
+  const xA2   = xB1 + panelB_w;
+  const xB2   = xA2 + panelA_w;
+  const xEnd  = xB2 + panelB_w;   // = flatW
 
-  // Column x positions (before scaling, in mm)
-  let cx = flapW_outer;  // left edge of A1 panel
-  const xA1 = cx;
-  const xB1 = cx + panelA_w;
-  const xA2 = xB1 + panelB_w;
-  const xB2 = xA2 + panelA_w;
-  const xGlue = xB2 + panelB_w;
+  // Y row boundaries
+  const yTop    = 0;
+  const yPanel  = flapH;
+  const yBotF   = flapH + panelA_h;
 
-  // Row y positions
-  const yTop = 0;          // top of top flaps
-  const yPanel = flapH;    // top of main panels
-  const yBotFlap = flapH + panelA_h;  // top of bottom flaps
+  let cuts = '', folds = '', dims = '';
 
-  // === MAIN PANELS (cut outline) ===
-  // Outer rectangle of whole blank
-  cuts += svgLine(tx(0), ty(yTop + flapH), tx(flapW_outer), ty(yTop + flapH), 'cut'); // left edge top flap bottom
-  // Draw each column as fold/cut mix
+  // ── Outer cut boundary ──────────────────────────────────────────────────
+  cuts += svgRect(tx(xGlue), ty(yTop), s(flatW), s(flatH), 'cut');
 
-  // A1 panel outline
-  folds += svgLine(tx(xA1), ty(yPanel), tx(xA1), ty(yPanel + panelA_h), 'fold'); // left fold line of A1
-  folds += svgLine(tx(xB1), ty(yPanel), tx(xB1), ty(yPanel + panelA_h), 'fold'); // right fold (B1 left)
-  folds += svgLine(tx(xA2), ty(yPanel), tx(xA2), ty(yPanel + panelA_h), 'fold');
-  folds += svgLine(tx(xB2), ty(yPanel), tx(xB2), ty(yPanel + panelA_h), 'fold');
-  folds += svgLine(tx(xGlue), ty(yPanel), tx(xGlue), ty(yPanel + panelA_h), 'fold');
+  // ── Vertical fold lines (panel dividers) ──────────────────────────────
+  [xA1, xB1, xA2, xB2].forEach(x => {
+    folds += svgLine(tx(x), ty(yPanel), tx(x), ty(yBotF), 'fold');
+  });
 
-  // Horizontal fold lines
-  folds += svgLine(tx(0), ty(yPanel), tx(xGlue + glue), ty(yPanel), 'fold');
-  folds += svgLine(tx(0), ty(yBotFlap), tx(xGlue + glue), ty(yBotFlap), 'fold');
+  // ── Horizontal fold lines (flap hinges) ─────────────────────────────
+  folds += svgLine(tx(xGlue), ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
+  folds += svgLine(tx(xGlue), ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
 
-  // Outer cut boundary
-  cuts += svgRect(tx(0), ty(yTop), s(flatW), s(flatH), 'cut');
-
-  // Top flaps cut slots (between A and B panels)
-  // Slots: between B and A panels at top and bottom
-  const slotY_top = ty(yTop);
-  const slotY_bot = ty(yBotFlap + flapH);
-
-  // Cut slots between panels at top: between A1/B1, B1/A2, A2/B2
-  function topFlapCut(panelX, flapLen, side) {
-    // side flap edge cut
-    const fx = tx(panelX);
-    const fw = s(flapLen);
-    const fy = ty(yTop);
-    const fh = s(flapH);
-    // horizontal slot cut line at panel boundary
-    return '';
+  // ── Slot cuts between adjacent flaps (top and bottom) ─────────────────
+  // RSC slots run vertically between B-panel flaps and A-panel flaps.
+  // At B1/A2 boundary: top + bottom slot
+  // At B2/end: no slot (B2 flap is last)
+  // We represent the slots as short vertical cut lines on the fold line
+  function drawSlots(panelX) {
+    // Top slot: from yTop to (yPanel - flapH + slotH)… actually slot is a gap *into* the flap
+    // Simplification: draw a slot-width cut gap between adjacent flap tops
+    const sx = tx(panelX);
+    const sw = s(slotW / 2);  // half on each side
+    // cut line from fold-hinge into flap (slot extends slotW into the flap from hinge)
+    cuts += svgLine(sx - sw, ty(yTop),    sx - sw, ty(yPanel),   'cut');
+    cuts += svgLine(sx + sw, ty(yTop),    sx + sw, ty(yPanel),   'cut');
+    cuts += svgLine(sx - sw, ty(yBotF),   sx - sw, ty(yBotF + flapH), 'cut');
+    cuts += svgLine(sx + sw, ty(yBotF),   sx + sw, ty(yBotF + flapH), 'cut');
+    // horizontal slot tops
+    cuts += svgLine(sx - sw, ty(yTop),    sx + sw, ty(yTop),    'cut');
+    cuts += svgLine(sx - sw, ty(yBotF + flapH), sx + sw, ty(yBotF + flapH), 'cut');
   }
+  [xB1, xA2, xB2].forEach(drawSlots);
+  // Also at A1 left edge and glue/A1 boundary
+  drawSlots(xA1);
 
-  // Top flaps for A panels (width = flapW_inner or flapW_outer)
-  // A1 top flap
-  cuts += svgRect(tx(flapW_outer), ty(yTop), s(panelA_w), s(flapH), 'cut');
-  // B1 top flap
-  cuts += svgRect(tx(xB1), ty(yTop), s(flapW_inner), s(flapH), 'cut');
-  // The outer B1 flap would be at left... actually let me draw the full layout properly
+  // ── Flap height annotation: minor vs major ────────────────────────────
+  // Top minor flap (B1, B2): flapH - ofVal in height → show as flapW_minor
+  // Top major flap (A1, A2): flapH
 
-  // Left outer flap (glue/tuck)
-  cuts += svgRect(tx(0), ty(yPanel), s(flapW_outer), s(panelA_h), 'cut');
-  // A2 top flap
-  cuts += svgRect(tx(xA2), ty(yTop), s(panelA_w), s(flapH), 'cut');
-  // B2 top flap (outer = ceil(W/2))
-  cuts += svgRect(tx(xB2), ty(yTop), s(flapW_outer), s(flapH), 'cut');
-  // A1 bottom flap
-  cuts += svgRect(tx(flapW_outer), ty(yBotFlap), s(panelA_w), s(flapH), 'cut');
-  // B1 bottom flap
-  cuts += svgRect(tx(xB1), ty(yBotFlap), s(flapW_inner), s(flapH), 'cut');
-  // A2 bottom flap
-  cuts += svgRect(tx(xA2), ty(yBotFlap), s(panelA_w), s(flapH), 'cut');
-  // B2 bottom flap
-  cuts += svgRect(tx(xB2), ty(yBotFlap), s(flapW_outer), s(flapH), 'cut');
+  // ── Dimension annotations ─────────────────────────────────────────────
+  const DY = 14;  // offset above/below blank for dims
 
-  // Glue tab
-  cuts += svgRect(tx(xGlue), ty(yPanel), s(glue), s(panelA_h), 'cut');
+  // Overall blank width (total)
+  dims += svgDim(tx(xGlue), ty(yTop)-DY, tx(xEnd), ty(yTop)-DY,
+    `${r(flatW)} mm`, true);
 
-  // Dimension annotations (outside the blank)
-  const dimY = ty(yTop) - 12;
-  const dimYBot = ty(flatH) + 12;
+  // Overall blank height (right side)
+  dims += svgDim(tx(xEnd)+DY, ty(yTop), tx(xEnd)+DY, ty(flatH),
+    `${r(flatH)} mm`, false);
 
-  // Overall dims
-  const dims = svgDim(tx(0), ty(yTop)-8, tx(flatW), ty(yTop)-8, `${r(flatW)} mm`, true)
-    + svgDim(tx(flatW)+8, ty(yTop), tx(flatW)+8, ty(flatH), `${r(flatH)} mm`, false);
+  // Panel widths — annotated inside each panel at mid-height
+  // A1 width = L (clickable → L)
+  dims += svgDim(tx(xA1), ty(yPanel + panelA_h/2),
+                 tx(xB1), ty(yPanel + panelA_h/2),
+                 `${L}`, false, 'L');
+  // B1 width = W (clickable → W)
+  dims += svgDim(tx(xB1), ty(yPanel + panelA_h/2),
+                 tx(xA2), ty(yPanel + panelA_h/2),
+                 `${W}`, false, 'W');
+  // A2 width = L again (no param link, duplicate)
+  dims += svgDim(tx(xA2), ty(yPanel + panelA_h/2),
+                 tx(xB2), ty(yPanel + panelA_h/2),
+                 `${L}`, false, 'L');
+  // B2 width = W again
+  dims += svgDim(tx(xB2), ty(yPanel + panelA_h/2),
+                 tx(xEnd), ty(yPanel + panelA_h/2),
+                 `${W}`, false, 'W');
+
+  // Panel height = H (clickable → D)
+  dims += svgDim(tx(xA1)-DY, ty(yPanel), tx(xA1)-DY, ty(yBotF),
+                 `${H}`, true, 'D');
+
+  // Top flap height = flapH (clickable → f)
+  dims += svgDim(tx(xA1)-DY, ty(yTop), tx(xA1)-DY, ty(yPanel),
+                 `${flapH}`, true, 'f');
+
+  // Glue tab width (clickable → g)
+  dims += svgDim(tx(xGlue), ty(yTop)-DY*2, tx(xA1), ty(yTop)-DY*2,
+                 `g:${glue}`, true, 'g');
+
+  // Slot width annotation on top slot at xB1
+  dims += svgDim(tx(xB1 - slotW/2), ty(yTop/2),
+                 tx(xB1 + slotW/2), ty(yTop/2),
+                 `sl:${r(slotW)}`, false, 'sl');
+
+  // High-low offset annotation on B1 top flap (show flapW_minor)
+  dims += svgDim(tx(xB1), ty(yTop),
+                 tx(xA2), ty(yTop),
+                 `of:${d.flapH - flapW_minor > 0 ? d.flapH - flapW_major : ''}`, false, 'of');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
   <g id="dims">${dims}</g>
   <g id="fold">${folds}</g>
   <g id="cut">${cuts}</g>
-  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0201 RSC — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+  <text x="${vw/2}" y="14" text-anchor="middle" font-size="11"
+    font-family="IBM Plex Mono,monospace" fill="#bbb">FEFCO 0201 RSC — L${L}×W${W}×D${H} t${CAL}mm</text>
 </svg>`;
 }
 
@@ -821,6 +974,41 @@ function _applyFoldAngle(t) {
   p.back.rotation.x  = (-Math.PI / 2) * maxOpen * (1 - tMajor);
   p.left.rotation.z  = (Math.PI / 2)  * maxOpen * (1 - tMinor);
   p.right.rotation.z = (-Math.PI / 2) * maxOpen * (1 - tMinor);
+}
+
+// ============================================================
+// PARAMETER PANEL — detail toggle + dim-label click highlight
+// ============================================================
+let _detailVisible = true;
+function toggleDetailParams() {
+  _detailVisible = !_detailVisible;
+  const sec = document.getElementById('pt-detail-section');
+  const btn = document.getElementById('btn-toggle-detail');
+  if (sec) sec.classList.toggle('hidden', !_detailVisible);
+  if (btn) btn.textContent = _detailVisible ? '隱藏細節參數' : '顯示細節參數';
+}
+
+// Called from SVG dim-label onclick to scroll + flash the matching row
+function highlightParam(code) {
+  const row = document.getElementById('pr-' + code);
+  if (!row) return;
+
+  // Expand detail section if the row lives inside it
+  const detail = document.getElementById('pt-detail-section');
+  if (detail && detail.contains(row) && !_detailVisible) toggleDetailParams();
+
+  // Remove any existing flash
+  document.querySelectorAll('.pt-row.flash').forEach(r => r.classList.remove('flash'));
+
+  // Flash + scroll
+  row.classList.add('flash');
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Focus the editable input (not readonly)
+  const inp = row.querySelector('input:not([readonly])');
+  if (inp) { setTimeout(() => inp.focus(), 300); }
+
+  setTimeout(() => row.classList.remove('flash'), 1800);
 }
 
 function setFoldProgress(t) {
@@ -1450,8 +1638,9 @@ function notify(msg) {
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
   // Input listeners
-  ['inp-L','inp-W','inp-H','inp-CAL'].forEach(id => {
-    document.getElementById(id).addEventListener('input', onInputChange);
+  ['inp-L','inp-W','inp-H','inp-t','inp-of','inp-g','inp-f','inp-sl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', onInputChange);
   });
 
   // Close overlays on backdrop click

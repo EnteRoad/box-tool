@@ -428,80 +428,77 @@ const BOX_LIBRARY = [
     }
   },
   {
-    code: 'FEFCO-0300',
-    label: 'FEFCO 0300',
-    nameCN: '單片折疊盤',
-    nameEN: 'One-piece Folder',
-    desc: '單片展開，四邊折起形成淺盤，角落有鎖合舌片。',
-    calc(L, W, H, CAL) {
-      const mfgW = L + 2 * (H + CAL);
-      const mfgH = W + 2 * (H + CAL);
-      const extL = L + 2 * CAL;
-      const extW = W + 2 * CAL;
-      const extH = H + 2 * CAL;
+    code: 'TRAY-0200',
+    label: 'TRAY 0200',
+    nameCN: '四角淺盤',
+    nameEN: 'Open Tray',
+    desc: '單片展開，四邊折起形成淺盤，四角切除。適合底座、托盤、淺盒。',
+    calc(L, W, H, CAL, extra = {}) {
+      const wH = H + CAL;
+      const bL = L + 2 * CAL;
+      const bW = W + 2 * CAL;
+      const mfgW = bL + 2 * wH;
+      const mfgH = bW + 2 * wH;
+      const extL = bL;
+      const extW = bW;
+      const extH = H + CAL;
       return {
-        mfgW, mfgH, extL, extW, extH,
+        wH, bL, bW, mfgW, mfgH, extL, extW, extH,
         rows: [
-          ['底部 L', L],
-          ['底部 W', W],
-          ['側邊高', H],
+          ['底部長', bL],
+          ['底部寬', bW],
+          ['側牆高', wH],
           ['製造寬', mfgW, true],
           ['製造高', mfgH, true],
-          ['外部 L', extL],
-          ['外部 W', extW],
-          ['外部 H', extH],
         ]
       };
     },
-    svgGen(L, W, H, CAL, vw, vh) {
-      return gen0300SVG(L, W, H, CAL, vw, vh);
+    svgGen(L, W, H, CAL, vw, vh, extra) {
+      return genTraySVG(L, W, H, CAL, vw, vh, extra);
     },
     build3D(L, W, H, CAL, scene) {
       return build0300_3D(L, W, H, CAL, scene);
     }
   },
   {
-    code: 'FEFCO-0401',
-    label: 'FEFCO 0401',
-    nameCN: '天地蓋紙箱',
-    nameEN: 'Set-up Box (Lid & Base)',
-    desc: '兩件式天地蓋，天蓋覆蓋地盒頂部，適合禮品包裝。',
-    calc(L, W, H, CAL) {
-      const lidH = Math.round(H / 3);
-      const baseH = H - lidH;
-      const lidL = L + 2 * CAL;
-      const lidW = W + 2 * CAL;
-      const mfgW_lid = lidL + 2 * (lidH + CAL);
-      const mfgH_lid = lidW + 2 * (lidH + CAL);
-      const mfgW_base = L + 2 * (baseH + CAL);
-      const mfgH_base = W + 2 * (baseH + CAL);
+    code: 'MAILER',
+    label: 'MAILER 飛機盒',
+    nameCN: '飛機盒',
+    nameEN: 'E-commerce Mailer Box',
+    desc: '電商常用一體成型紙箱，免膠帶，自鎖底部，適合快遞包裝。',
+    calc(L, W, H, CAL, extra = {}) {
+      const { gTab = 30 } = extra;
+      const panelA_w = L + CAL;
+      const panelB_w = W + CAL;
+      const glue = gTab > 0 ? Math.max(gTab, CAL + 5) : 0;
+      const bodyH = H + 2 * CAL;
+      const topH  = Math.round(W / 2);
+      const botH  = Math.round(W / 2);
+      const mfgW  = 2 * panelA_w + 2 * panelB_w + glue;
+      const mfgH  = topH + bodyH + botH;
       const extL = L + 2 * CAL;
       const extW = W + 2 * CAL;
       const extH = H + 2 * CAL;
       return {
-        lidH, baseH, lidL, lidW,
-        mfgW_lid, mfgH_lid, mfgW_base, mfgH_base,
-        extL, extW, extH,
+        panelA_w, panelB_w, glue, bodyH, topH, botH,
+        mfgW, mfgH, extL, extW, extH,
         rows: [
-          ['天蓋內尺寸 L', lidL],
-          ['天蓋內尺寸 W', lidW],
-          ['天蓋高', lidH],
-          ['地盒高', baseH],
-          ['天蓋製造寬', mfgW_lid, true],
-          ['天蓋製造高', mfgH_lid, true],
-          ['地盒製造寬', mfgW_base, true],
-          ['地盒製造高', mfgH_base, true],
-          ['外部 L', extL],
-          ['外部 W', extW],
-          ['外部 H', extH],
+          ['面板 A 寬', panelA_w],
+          ['面板 B 寬', panelB_w],
+          ['主體高', bodyH],
+          ['蓋翼高', topH],
+          ['底翼高', botH],
+          ['黏位', glue],
+          ['製造寬', mfgW, true],
+          ['製造高', mfgH, true],
         ]
       };
     },
-    svgGen(L, W, H, CAL, vw, vh) {
-      return gen0401SVG(L, W, H, CAL, vw, vh);
+    svgGen(L, W, H, CAL, vw, vh, extra) {
+      return genMailerSVG(L, W, H, CAL, vw, vh, extra);
     },
     build3D(L, W, H, CAL, scene) {
-      return build0401_3D(L, W, H, CAL, scene);
+      return null;
     }
   }
 ];
@@ -793,96 +790,150 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
 </svg>`;
 }
 
-// ---- FEFCO 0300 SVG ----
-function gen0300SVG(L, W, H, CAL, vw, vh) {
-  const d = BOX_LIBRARY[1].calc(L, W, H, CAL);
-  const { mfgW, mfgH } = d;
-  const flatW = mfgW;
-  const flatH = mfgH;
-  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 70);
-  const s = v => v * scale;
+// ---- Open Tray SVG (淺盤) ----
+function genTraySVG(L, W, H, CAL, vw, vh, extra) {
+  extra = extra || {};
+  const wH = H + CAL;
+  const bL = L + 2 * CAL;
+  const bW = W + 2 * CAL;
+  const flatW = bL + 2 * wH;
+  const flatH = bW + 2 * wH;
+
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 80);
+  const s  = v => v * scale;
   const tx = v => ox + v * scale;
   const ty = v => oy + v * scale;
 
-  // Layout: corner tabs + sides around center bottom
-  let cuts = '', folds = '';
-  const tab = H;
-  // Center bottom
-  const cx = H + CAL;
-  const cy = H + CAL;
-  // Outer boundary
-  cuts += svgRect(tx(0), ty(0), s(flatW), s(flatH), 'cut');
-  // Fold lines: horizontal
-  folds += svgLine(tx(0), ty(cy), tx(flatW), ty(cy), 'fold');
-  folds += svgLine(tx(0), ty(cy + W), tx(flatW), ty(cy + W), 'fold');
-  // Fold lines: vertical
-  folds += svgLine(tx(cx), ty(0), tx(cx), ty(flatH), 'fold');
-  folds += svgLine(tx(cx + L), ty(0), tx(cx + L), ty(flatH), 'fold');
+  const x0 = 0, x1 = wH, x2 = wH + bL, x3 = flatW;
+  const y0 = 0, y1 = wH, y2 = wH + bW, y3 = flatH;
 
-  // Corner tabs (cut out)
-  const corners = [
-    [tx(0), ty(0), s(cx), s(cy)],
-    [tx(cx + L), ty(0), s(H + CAL), s(cy)],
-    [tx(0), ty(cy + W), s(cx), s(H + CAL)],
-    [tx(cx + L), ty(cy + W), s(H + CAL), s(H + CAL)],
-  ];
-  corners.forEach(([x, y, w, h]) => {
-    // draw X through corner to show cutout
-    folds += svgLine(x, y, x+w, y+h, 'fold');
-    folds += svgLine(x+w, y, x, y+h, 'fold');
-  });
+  let cuts = '', folds = '', dims = '';
 
-  const dims = svgDim(tx(0), ty(0)-10, tx(flatW), ty(0)-10, `${r(flatW)} mm`, true)
-    + svgDim(tx(flatW)+10, ty(0), tx(flatW)+10, ty(flatH), `${r(flatH)} mm`, false);
+  // Outer cut boundary — cross/plus shape (cut corners)
+  cuts += svgLine(tx(x1), ty(y0), tx(x2), ty(y0), 'cut');  // top
+  cuts += svgLine(tx(x3), ty(y1), tx(x3), ty(y2), 'cut');  // right
+  cuts += svgLine(tx(x1), ty(y3), tx(x2), ty(y3), 'cut');  // bottom
+  cuts += svgLine(tx(x0), ty(y1), tx(x0), ty(y2), 'cut');  // left
+  // Corner notches
+  cuts += svgLine(tx(x1), ty(y0), tx(x1), ty(y1), 'cut');
+  cuts += svgLine(tx(x0), ty(y1), tx(x1), ty(y1), 'cut');
+  cuts += svgLine(tx(x2), ty(y0), tx(x2), ty(y1), 'cut');
+  cuts += svgLine(tx(x3), ty(y1), tx(x2), ty(y1), 'cut');
+  cuts += svgLine(tx(x1), ty(y3), tx(x1), ty(y2), 'cut');
+  cuts += svgLine(tx(x0), ty(y2), tx(x1), ty(y2), 'cut');
+  cuts += svgLine(tx(x2), ty(y3), tx(x2), ty(y2), 'cut');
+  cuts += svgLine(tx(x3), ty(y2), tx(x2), ty(y2), 'cut');
+
+  // Fold lines
+  folds += svgLine(tx(x1), ty(y1), tx(x2), ty(y1), 'fold');
+  folds += svgLine(tx(x1), ty(y2), tx(x2), ty(y2), 'fold');
+  folds += svgLine(tx(x1), ty(y1), tx(x1), ty(y2), 'fold');
+  folds += svgLine(tx(x2), ty(y1), tx(x2), ty(y2), 'fold');
+
+  // Dimension annotations
+  const DY = 14;
+  dims += svgDim(tx(x1), ty(y0)-DY, tx(x2), ty(y0)-DY, `${r(flatW)} mm`, true);
+  dims += svgDim(tx(x3)+DY, ty(y0), tx(x3)+DY, ty(y3), `${r(flatH)} mm`, false);
+  dims += svgDim(tx(x1)-DY, ty(y1), tx(x1)-DY, ty(y2), `${W}`, true, 'W');
+  dims += svgDim(tx(x1), ty(y1 + (y2-y1)/2), tx(x2), ty(y1 + (y2-y1)/2), `${L}`, false, 'L');
+  dims += svgDim(tx(x1)-DY, ty(y0), tx(x1)-DY, ty(y1), `${r(wH)}`, true, 'D');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
   <g id="dims">${dims}</g>
   <g id="fold">${folds}</g>
   <g id="cut">${cuts}</g>
-  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0300 — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+  <text x="${vw/2}" y="14" text-anchor="middle" font-size="11"
+    font-family="IBM Plex Mono,monospace" fill="#bbb">淺盤 Open Tray — L${L}×W${W}×H${H} t${CAL}mm</text>
 </svg>`;
 }
 
-// ---- FEFCO 0401 SVG ----
-function gen0401SVG(L, W, H, CAL, vw, vh) {
-  const d = BOX_LIBRARY[2].calc(L, W, H, CAL);
-  const { lidH, baseH, lidL, lidW, mfgW_lid, mfgH_lid, mfgW_base, mfgH_base } = d;
+// ---- Mailer Box SVG (飛機盒) ----
+function genMailerSVG(L, W, H, CAL, vw, vh, extra) {
+  extra = extra || {};
+  const { gTab = 30 } = extra;
+  const panelA = L + CAL;
+  const panelB = W + CAL;
+  const glue   = gTab > 0 ? Math.max(gTab, CAL + 5) : 0;
+  const bodyH  = H + 2 * CAL;
+  const topH   = Math.round(W / 2);
+  const botH   = Math.round(W / 2);
+  const flatW  = 2 * panelA + 2 * panelB + glue;
+  const flatH  = topH + bodyH + botH;
 
-  // Draw lid on left, base on right side by side
-  const gap = 20;
-  const totalW = mfgW_lid + gap + mfgW_base;
-  const totalH = Math.max(mfgH_lid, mfgH_base);
-  const { scale, ox, oy } = calcScale(totalW, totalH, vw, vh, 70);
-  const s = v => v * scale;
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 80);
+  const s  = v => v * scale;
   const tx = v => ox + v * scale;
-  const ty = v => oy + (totalH - (v > mfgW_lid + gap ? mfgH_base : mfgH_lid)) / 2 * scale;
+  const ty = v => oy + v * scale;
 
-  let cuts = '', folds = '';
+  // X positions (same as 0201)
+  const xG  = 0;
+  const xA1 = glue;
+  const xB1 = xA1 + panelA;
+  const xA2 = xB1 + panelB;
+  const xB2 = xA2 + panelA;
+  const xEnd = xB2 + panelB;
 
-  // LID
-  cuts += svgRect(tx(0), oy * 1, s(mfgW_lid), s(mfgH_lid), 'cut');
-  folds += svgLine(tx(lidH + CAL), oy * 1, tx(lidH + CAL), oy * 1 + s(mfgH_lid), 'fold');
-  folds += svgLine(tx(mfgW_lid - lidH - CAL), oy * 1, tx(mfgW_lid - lidH - CAL), oy * 1 + s(mfgH_lid), 'fold');
-  folds += svgLine(tx(0), oy * 1 + s(lidH + CAL), tx(mfgW_lid), oy * 1 + s(lidH + CAL), 'fold');
-  folds += svgLine(tx(0), oy * 1 + s(mfgH_lid - lidH - CAL), tx(mfgW_lid), oy * 1 + s(mfgH_lid - lidH - CAL), 'fold');
+  // Y positions
+  const yTop  = 0;
+  const yBody = topH;
+  const yBotF = topH + bodyH;
+  const yEnd  = flatH;
 
-  // BASE
-  const bx = mfgW_lid + gap;
-  cuts += svgRect(tx(bx), oy * 1, s(mfgW_base), s(mfgH_base), 'cut');
-  folds += svgLine(tx(bx + baseH + CAL), oy * 1, tx(bx + baseH + CAL), oy * 1 + s(mfgH_base), 'fold');
-  folds += svgLine(tx(bx + mfgW_base - baseH - CAL), oy * 1, tx(bx + mfgW_base - baseH - CAL), oy * 1 + s(mfgH_base), 'fold');
-  folds += svgLine(tx(bx), oy * 1 + s(baseH + CAL), tx(bx + mfgW_base), oy * 1 + s(baseH + CAL), 'fold');
-  folds += svgLine(tx(bx), oy * 1 + s(mfgH_base - baseH - CAL), tx(bx + mfgW_base), oy * 1 + s(mfgH_base - baseH - CAL), 'fold');
+  let cuts = '', folds = '', dims = '';
 
-  // Labels
-  const label = `<text x="${tx(mfgW_lid/2)}" y="${oy - 12}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono,monospace" fill="#4361EE">天蓋 LID</text>
-<text x="${tx(bx + mfgW_base/2)}" y="${oy - 12}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono,monospace" fill="#E63946">地盒 BASE</text>`;
+  // ── Outer boundary (stepped: B-panel flaps can be shorter with of offset,
+  //    for simplicity use uniform height here)
+  cuts += svgLine(tx(xG),  ty(yTop),  tx(xEnd), ty(yTop),  'cut'); // top
+  cuts += svgLine(tx(xEnd),ty(yTop),  tx(xEnd), ty(yEnd),  'cut'); // right
+  cuts += svgLine(tx(xEnd),ty(yEnd),  tx(xG),   ty(yEnd),  'cut'); // bottom
+  cuts += svgLine(tx(xG),  ty(yEnd),  tx(xG),   ty(yTop),  'cut'); // left
+
+  // ── Horizontal fold lines
+  folds += svgLine(tx(xG), ty(yBody), tx(xEnd), ty(yBody), 'fold');
+  folds += svgLine(tx(xG), ty(yBotF), tx(xEnd), ty(yBotF), 'fold');
+
+  // ── Vertical fold lines (panel dividers in body zone)
+  [xA1, xB1, xA2, xB2].forEach(x => {
+    folds += svgLine(tx(x), ty(yBody), tx(x), ty(yBotF), 'fold');
+  });
+
+  // ── Slot lines between adjacent flaps (top + bottom)
+  const slotW = CAL + 2;
+  [[xA1,true,true],[xB1,true,false],[xA2,false,true],[xB2,true,false]].forEach(([px,lM,rM]) => {
+    const sx = tx(px), sw = s(slotW / 2);
+    cuts += svgLine(sx-sw, ty(yBody), sx-sw, ty(yTop), 'cut');
+    cuts += svgLine(sx+sw, ty(yBody), sx+sw, ty(yTop), 'cut');
+    cuts += svgLine(sx-sw, ty(yBotF), sx-sw, ty(yEnd), 'cut');
+    cuts += svgLine(sx+sw, ty(yBotF), sx+sw, ty(yEnd), 'cut');
+  });
+
+  // ── Simple lock tab on top/bottom of B2 panel (right side)
+  const tabW = s(panelB * 0.4);
+  const tabH = s(Math.min(topH, botH) * 0.55);
+  // top B2 tab
+  const btx = tx(xB2 + panelB * 0.3);
+  cuts += svgLine(btx,        ty(yBody), btx,          ty(yBody)-tabH, 'cut');
+  cuts += svgLine(btx,        ty(yBody)-tabH, btx+tabW, ty(yBody)-tabH, 'cut');
+  cuts += svgLine(btx+tabW,   ty(yBody)-tabH, btx+tabW, ty(yBody), 'cut');
+
+  // ── Dimension annotations
+  const DY = 14;
+  dims += svgDim(tx(xG), ty(yTop)-DY, tx(xEnd), ty(yTop)-DY, `${r(flatW)} mm`, true);
+  dims += svgDim(tx(xEnd)+DY, ty(yTop), tx(xEnd)+DY, ty(yEnd), `${r(flatH)} mm`, false);
+  dims += svgDim(tx(xA1), ty(yBody + bodyH/2), tx(xB1), ty(yBody + bodyH/2), `${L}`, false, 'L');
+  dims += svgDim(tx(xB1), ty(yBody + bodyH/2), tx(xA2), ty(yBody + bodyH/2), `${W}`, false, 'W');
+  dims += svgDim(tx(xA2), ty(yBody + bodyH/2), tx(xB2), ty(yBody + bodyH/2), `${L}`, false, 'L');
+  dims += svgDim(tx(xB2), ty(yBody + bodyH/2), tx(xEnd), ty(yBody + bodyH/2), `${W}`, false, 'W');
+  dims += svgDim(tx(xA1)-DY, ty(yBody), tx(xA1)-DY, ty(yBotF), `${H}`, true, 'D');
+  dims += svgDim(tx(xA1)-DY, ty(yTop), tx(xA1)-DY, ty(yBody), `${topH}`, true, 'f');
+  if (glue > 0) dims += svgDim(tx(xG), ty(yTop)-DY*2, tx(xA1), ty(yTop)-DY*2, `g:${r(glue)}`, true, 'g');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
-  <g id="dims">${label}</g>
+  <g id="dims">${dims}</g>
   <g id="fold">${folds}</g>
   <g id="cut">${cuts}</g>
-  <text x="${vw/2}" y="16" text-anchor="middle" font-size="12" font-family="IBM Plex Mono,monospace" fill="#aaa">FEFCO 0401 天地蓋 — L${L}×W${W}×H${H} CAL${CAL}mm</text>
+  <text x="${vw/2}" y="14" text-anchor="middle" font-size="11"
+    font-family="IBM Plex Mono,monospace" fill="#bbb">飛機盒 Mailer — L${L}×W${W}×H${H} t${CAL}mm</text>
 </svg>`;
 }
 
@@ -1545,18 +1596,35 @@ function getBoxIcon(code) {
     <rect x="45" y="2" width="17" height="8" stroke="#E63946" stroke-width="1"/>
     <rect x="62" y="2" width="13" height="8" stroke="#E63946" stroke-width="1"/>
   </svg>`;
-  if (code === 'FEFCO-0300') return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="5" y="5" width="70" height="45" stroke="#E63946" stroke-width="1.5"/>
-    <line x1="18" y1="5" x2="18" y2="50" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
-    <line x1="62" y1="5" x2="62" y2="50" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
-    <line x1="5" y1="18" x2="75" y2="18" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
-    <line x1="5" y1="37" x2="75" y2="37" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+  if (code === 'TRAY-0200') return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="18" y1="5" x2="62" y2="5" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="5" y1="18" x2="5" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="75" y1="18" x2="75" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="18" y1="50" x2="62" y2="50" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="18" y1="5" x2="18" y2="18" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="5" y1="18" x2="18" y2="18" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="62" y1="5" x2="62" y2="18" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="75" y1="18" x2="62" y2="18" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="18" y1="50" x2="18" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="5" y1="37" x2="18" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="62" y1="50" x2="62" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="75" y1="37" x2="62" y2="37" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="18" y1="18" x2="62" y2="18" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="18" y1="37" x2="62" y2="37" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="18" y1="18" x2="18" y2="37" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="62" y1="18" x2="62" y2="37" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+  </svg>`;
+  if (code === 'MAILER') return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="3" width="70" height="49" stroke="#E63946" stroke-width="1.5"/>
+    <line x1="5" y1="13" x2="75" y2="13" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="5" y1="42" x2="75" y2="42" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="18" y1="13" x2="18" y2="42" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="36" y1="13" x2="36" y2="42" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="56" y1="13" x2="56" y2="42" stroke="#4361EE" stroke-width="1" stroke-dasharray="4,2"/>
   </svg>`;
   return `<svg viewBox="0 0 80 55" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="5" y="3" width="34" height="24" stroke="#4361EE" stroke-width="1.5"/>
-    <rect x="41" y="3" width="34" height="49" stroke="#E63946" stroke-width="1.5"/>
-    <text x="22" y="18" text-anchor="middle" font-size="8" fill="#4361EE">LID</text>
-    <text x="58" y="30" text-anchor="middle" font-size="8" fill="#E63946">BASE</text>
+    <rect x="10" y="10" width="60" height="35" stroke="#888" stroke-width="1.5"/>
+    <text x="40" y="31" text-anchor="middle" font-size="9" fill="#888">?</text>
   </svg>`;
 }
 

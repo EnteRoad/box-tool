@@ -426,6 +426,56 @@ const BOX_LIBRARY = [
     build3D(L, W, H, CAL, scene, fVal) {
       return build0201_3D(L, W, H, CAL, scene, fVal);
     }
+  },
+  {
+    code: 'ONE-PIECE',
+    label: '一體式外箱',
+    nameCN: '一體式外箱',
+    nameEN: 'One-Piece Integrated Lid Box',
+    desc: '頂部兩片大翼全覆蓋（深度=W），底部標準RSC。適合機器自動開箱。',
+    calc(L, W, H, CAL, extra = {}) {
+      const { of: ofVal = 0, gTab = 30, f: fOverride = 0, sl: slOverride = 0 } = extra;
+      const glue     = gTab > 0 ? Math.max(gTab, CAL + 5) : 0;
+      const slotRaw  = slOverride > 0 ? slOverride : CAL + 2;
+      const slotW    = Math.min(slotRaw, Math.floor(Math.min(L, W) / 3));
+      const panelA_w = L + CAL;
+      const panelA_h = H + 2 * CAL;
+      const panelB_w = W + CAL;
+      // Top: A flap = W (full coverage), B = dust flap; user can override A depth via f
+      const topFlap_A = fOverride > 0 ? fOverride : W;
+      const dustH     = Math.max(20, Math.round(W / 6));
+      // Bottom: standard RSC with of
+      const botFlap_A  = Math.round(W / 2);
+      const botFlapMin = Math.max(botFlap_A - ofVal, 1);
+      const flatW = glue + panelA_w + panelB_w + panelA_w + panelB_w;
+      const flatH = topFlap_A + panelA_h + botFlap_A;
+      const mfgW  = flatW;
+      const mfgH  = flatH;
+      return {
+        glue, slotW, panelA_w, panelA_h, panelB_w,
+        topFlap_A, dustH, botFlap_A, botFlapMin,
+        flatW, flatH, mfgW, mfgH,
+        rows: [
+          ['面板 A 寬', panelA_w],
+          ['面板 B 寬', panelB_w],
+          ['面板高',    panelA_h],
+          ['頂翼A(大)', topFlap_A],
+          ['頂翼B(塵)', dustH],
+          ['底翼(A)',   botFlap_A],
+          ['底翼(B)',   botFlapMin],
+          ['開槽寬',    slotW],
+          ['黏位',      glue],
+          ['製造寬',    mfgW, true],
+          ['製造高',    mfgH, true],
+        ]
+      };
+    },
+    svgGen(L, W, H, CAL, vw, vh, extra) {
+      return genOnePieceSVG(L, W, H, CAL, vw, vh, extra);
+    },
+    build3D(L, W, H, CAL, scene) {
+      return buildOnePiece3D(L, W, H, CAL, scene);
+    }
   }
 ];
 
@@ -867,6 +917,116 @@ function genMailerSVG(L, W, H, CAL, vw, vh, extra) {
 </svg>`;
 }
 
+// ---- One-Piece Lid Box SVG (一體式外箱) ----
+function genOnePieceSVG(L, W, H, CAL, vw, vh, extra) {
+  extra = extra || {};
+  const { of: ofVal = 0, gTab = 30, f: fOverride = 0, sl: slOverride = 0 } = extra;
+  const d = BOX_LIBRARY[1].calc(L, W, H, CAL, extra);
+  const { glue, slotW, panelA_w, panelA_h, panelB_w,
+          topFlap_A, dustH, botFlap_A, botFlapMin, flatW, flatH } = d;
+
+  const { scale, ox, oy } = calcScale(flatW, flatH, vw, vh, 80);
+  const s  = v => v * scale;
+  const tx = v => ox + v * scale;
+  const ty = v => oy + v * scale;
+
+  // X column boundaries
+  const xGlue = 0;
+  const xA1   = glue;
+  const xB1   = xA1 + panelA_w;
+  const xA2   = xB1 + panelB_w;
+  const xB2   = xA2 + panelA_w;
+  const xEnd  = xB2 + panelB_w;
+
+  // Y row boundaries
+  // Top: A flaps = topFlap_A (large, full top coverage), B flaps = dustH (short dust flap)
+  const yTopMaj = 0;                        // top of A panel top flaps
+  const yTopMin = topFlap_A - dustH;        // top of B panel dust flaps
+  const yPanel  = topFlap_A;               // body top fold line
+  const yBotF   = topFlap_A + panelA_h;   // body bottom fold line
+  // Bottom: standard RSC with of
+  const yBotMaj = flatH;                           // bottom of A panel bottom flaps
+  const yBotMin = yBotF + botFlapMin;              // bottom of B panel bottom flaps
+
+  let cuts = '', folds = '', dims = '';
+
+  // ── Outer cut boundary ────────────────────────────────────────────────────
+  // Top: glue tab has no flap; stepped at A/B boundaries
+  cuts += svgLine(tx(xA1),   ty(yPanel),  tx(xA1),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xA1),   ty(yTopMaj), tx(xB1),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yTopMaj), tx(xB1),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yTopMin), tx(xA2),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yTopMin), tx(xA2),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yTopMaj), tx(xB2),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yTopMaj), tx(xB2),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yTopMin), tx(xEnd), ty(yTopMin), 'cut');
+  // Right edge
+  cuts += svgLine(tx(xEnd),  ty(yTopMin), tx(xEnd), ty(yBotMin), 'cut');
+  // Bottom: standard RSC with of offset on B panels
+  cuts += svgLine(tx(xEnd),  ty(yBotMin), tx(xB2),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yBotMin), tx(xB2),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yBotMaj), tx(xA2),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yBotMaj), tx(xA2),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yBotMin), tx(xB1),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yBotMin), tx(xB1),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yBotMaj), tx(xA1),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xA1),   ty(yBotMaj), tx(xA1),  ty(yBotF),   'cut');
+  // Glue tab (body height only, no flaps)
+  cuts += svgLine(tx(xA1),   ty(yBotF),   tx(xGlue),ty(yBotF),   'cut');
+  cuts += svgLine(tx(xGlue), ty(yBotF),   tx(xGlue),ty(yPanel),  'cut');
+  cuts += svgLine(tx(xGlue), ty(yPanel),  tx(xA1),  ty(yPanel),  'cut');
+
+  // ── Vertical fold lines (body zone only) ──────────────────────────────────
+  [xA1, xB1, xA2, xB2].forEach(x => {
+    folds += svgLine(tx(x), ty(yPanel), tx(x), ty(yBotF), 'fold');
+  });
+
+  // ── Horizontal fold lines ─────────────────────────────────────────────────
+  folds += svgLine(tx(xA1), ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
+  folds += svgLine(tx(xA1), ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
+
+  // ── Bottom slot cuts only (top is full-overlap, no slots needed) ──────────
+  const slotDefs = [
+    [xB1, true,  false],   // A1 ↔ B1
+    [xA2, false, true ],   // B1 ↔ A2
+    [xB2, true,  false],   // A2 ↔ B2
+  ];
+  slotDefs.forEach(([px, lMaj, rMaj]) => {
+    const sx = tx(px), sw = s(slotW / 2);
+    cuts += svgLine(sx - sw, ty(yBotF), sx - sw, ty(lMaj ? yBotMaj : yBotMin), 'cut');
+    cuts += svgLine(sx + sw, ty(yBotF), sx + sw, ty(rMaj ? yBotMaj : yBotMin), 'cut');
+  });
+
+  // ── Dimension annotations ─────────────────────────────────────────────────
+  const DY = 14;
+  dims += svgDim(tx(xGlue), ty(yTopMaj)-DY,   tx(xEnd), ty(yTopMaj)-DY,   `${r(flatW)} mm`, true);
+  dims += svgDim(tx(xEnd)+DY, ty(yTopMaj),    tx(xEnd)+DY, ty(yBotMaj),   `${r(flatH)} mm`, false);
+  dims += svgDim(tx(xA1), ty(yPanel+panelA_h/2), tx(xB1), ty(yPanel+panelA_h/2), `${L}`, false, 'L');
+  dims += svgDim(tx(xB1), ty(yPanel+panelA_h/2), tx(xA2), ty(yPanel+panelA_h/2), `${W}`, false, 'W');
+  dims += svgDim(tx(xA2), ty(yPanel+panelA_h/2), tx(xB2), ty(yPanel+panelA_h/2), `${L}`, false, 'L');
+  dims += svgDim(tx(xB2), ty(yPanel+panelA_h/2), tx(xEnd), ty(yPanel+panelA_h/2), `${W}`, false, 'W');
+  dims += svgDim(tx(xA1)-DY, ty(yPanel),      tx(xA1)-DY, ty(yBotF),      `${H}`, true, 'D');
+  // Top A flap height (large)
+  dims += svgDim(tx(xA1)-DY, ty(yTopMaj),     tx(xA1)-DY, ty(yPanel),     `${topFlap_A}`, true, 'f');
+  // Top B dust flap height
+  dims += svgDim(tx(xB1)+4,  ty(yTopMin),     tx(xB1)+4,  ty(yPanel),     `${dustH}`, false);
+  // Bottom A flap height
+  dims += svgDim(tx(xA2)-DY, ty(yBotF),       tx(xA2)-DY, ty(yBotMaj),   `${botFlap_A}`, true);
+  // Bottom B flap height
+  if (ofVal > 0) dims += svgDim(tx(xB1)+4, ty(yBotMin), tx(xB1)+4, ty(yBotF), `${botFlapMin}`, false, 'of');
+  // Slot width
+  dims += svgDim(tx(xB1-slotW/2), ty(yBotMin+(yBotMaj-yBotMin)/2),
+                 tx(xB1+slotW/2), ty(yBotMin+(yBotMaj-yBotMin)/2), `sl:${r(slotW)}`, false, 'sl');
+  // Glue tab
+  dims += svgDim(tx(xGlue), ty(yPanel)-DY,    tx(xA1),   ty(yPanel)-DY,   `g:${glue}`, true, 'g');
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
+  <g id="dims">${dims}</g>
+  <g id="fold">${folds}</g>
+  <g id="cut">${cuts}</g>
+</svg>`;
+}
+
 // ============================================================
 // THREE.JS 3D
 // ============================================================
@@ -1035,9 +1195,8 @@ function onFoldSlider(val) {
 }
 
 function toggleFoldAnim() {
-  // Only 0201 supports fold animation
-  if (currentBoxIdx !== 0 || !window._flapPivots) {
-    notify('折疊動畫僅支援 FEFCO 0201'); return;
+  if (!window._flapPivots) {
+    notify('此盒型不支援折疊動畫'); return;
   }
   if (_foldTween && _foldTween.isActive()) {
     _foldTween.pause();
@@ -1245,6 +1404,69 @@ function build0201_3D(L, W, H, CAL, scene, fVal) {
     bot: { A1: bfA1, B1: bfB1, A2: bfA2, B2: bfB2 },
   };
   window._foldState  = window._foldState || { t: 0 };
+  _applyFoldAngle(window._foldState.t);
+}
+
+// One-Piece Lid 3D — same chain-fold animation as 0201
+// Top A flaps depth = W (large), Top B flaps depth = dustH (small dust flap)
+// Bottom flaps = W/2 (standard RSC)
+function buildOnePiece3D(L, W, H, CAL, scene) {
+  const T       = 4;
+  const topFd_A = W;
+  const topFd_B = Math.max(20, Math.round(W / 6));
+  const botFd   = Math.round(W / 2);
+  const mat     = CARDBOARD;
+  const matF    = CARDBOARD_EDGE;
+  const scoreMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
+
+  const group = new THREE.Group();
+  group.userData.isBoxModel = true;
+  group.position.set(-L / 2, 0, -W / 2);
+
+  function makePanelGroup(panelW, tfd, bfd) {
+    const pg = new THREE.Group();
+    const pm = new THREE.Mesh(new THREE.BoxGeometry(panelW, H, T), mat);
+    pm.position.set(panelW / 2, H / 2, 0);
+    pg.add(pm);
+    const sz = T / 2 + 0.5;
+    [0, H].forEach(yLine => {
+      const pts = [new THREE.Vector3(0, yLine, sz), new THREE.Vector3(panelW, yLine, sz)];
+      pg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), scoreMat));
+    });
+    const tfp = new THREE.Group();
+    tfp.position.set(panelW / 2, H, 0);
+    const tfm = new THREE.Mesh(new THREE.BoxGeometry(panelW - T * 2, tfd, T), matF);
+    tfm.position.set(0, tfd / 2, 0);
+    tfp.add(tfm);
+    pg.add(tfp);
+    const bfp = new THREE.Group();
+    bfp.position.set(panelW / 2, 0, 0);
+    const bfm = new THREE.Mesh(new THREE.BoxGeometry(panelW - T * 2, bfd, T), matF);
+    bfm.position.set(0, -bfd / 2, 0);
+    bfp.add(bfm);
+    pg.add(bfp);
+    return { pg, tfp, bfp };
+  }
+
+  const { pg: pgA1, tfp: tfA1, bfp: bfA1 } = makePanelGroup(L, topFd_A, botFd);
+  group.add(pgA1);
+  const hingeB1 = new THREE.Group(); hingeB1.position.set(L, 0, 0); pgA1.add(hingeB1);
+  const { pg: pgB1, tfp: tfB1, bfp: bfB1 } = makePanelGroup(W, topFd_B, botFd);
+  hingeB1.add(pgB1);
+  const hingeA2 = new THREE.Group(); hingeA2.position.set(W, 0, 0); pgB1.add(hingeA2);
+  const { pg: pgA2, tfp: tfA2, bfp: bfA2 } = makePanelGroup(L, topFd_A, botFd);
+  hingeA2.add(pgA2);
+  const hingeB2 = new THREE.Group(); hingeB2.position.set(L, 0, 0); pgA2.add(hingeB2);
+  const { pg: pgB2, tfp: tfB2, bfp: bfB2 } = makePanelGroup(W, topFd_B, botFd);
+  hingeB2.add(pgB2);
+
+  scene.add(group);
+  window._hinges     = { B1: hingeB1, A2: hingeA2, B2: hingeB2 };
+  window._flapPivots = {
+    top: { A1: tfA1, B1: tfB1, A2: tfA2, B2: tfB2 },
+    bot: { A1: bfA1, B1: bfB1, A2: bfA2, B2: bfB2 },
+  };
+  window._foldState = window._foldState || { t: 0 };
   _applyFoldAngle(window._foldState.t);
 }
 

@@ -579,7 +579,13 @@ function renderSVG() {
   const box = BOX_LIBRARY[currentBoxIdx];
   const vw = svgArea.clientWidth || 800;
   const vh = svgArea.clientHeight || 600;
-  svgArea.innerHTML = box.svgGen(L, W, H, CAL, vw, vh, { of: ofVal, gTab, f: fVal, sl: slVal });
+  try {
+    svgArea.innerHTML = box.svgGen(L, W, H, CAL, vw, vh, { of: ofVal, gTab, f: fVal, sl: slVal });
+  } catch(e) {
+    svgArea.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}">
+      <text x="20" y="40" font-size="13" fill="#E63946" font-family="monospace">SVG 錯誤: ${e.message}</text></svg>`;
+    console.error('renderSVG error:', e);
+  }
 }
 
 // SVG helper: scale flat diagram to viewport

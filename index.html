@@ -373,8 +373,8 @@ const BOX_LIBRARY = [
     desc: '最常見的瓦楞紙箱型，四片側板加上頂底蓋翼。',
     calc(L, W, H, CAL, extra = {}) {
       const { of: ofVal = 1, gTab = 30, f: fOverride = 0, sl: slOverride = 0 } = extra;
-      // Flap depth: user override or H/2
-      const flapH_auto = Math.round(H / 2);
+      // Flap depth: user override or W/2 (flaps close across the W direction)
+      const flapH_auto = Math.round(W / 2);
       const flapH      = fOverride > 0 ? fOverride : flapH_auto;
       // Flap widths (minor = floor(W/2) - ofVal, major = ceil(W/2))
       const flapW_minor = Math.floor(W / 2) - ofVal;   // short-side (B panels), slightly shorter

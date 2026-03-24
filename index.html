@@ -635,6 +635,7 @@ function r(n) { return Math.round(n * 10) / 10; }
 // ---- FEFCO 0201 SVG ----
 function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   extra = extra || {};
+  const { of: ofVal = 1 } = extra;
   const d = BOX_LIBRARY[0].calc(L, W, H, CAL, extra);
   const { panelA_w, panelA_h, panelB_w, flapH, flapW_minor, flapW_major, slotW, glue } = d;
 

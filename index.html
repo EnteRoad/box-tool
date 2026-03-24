@@ -443,7 +443,7 @@ const BOX_LIBRARY = [
       const panelB_w = W + CAL;
       // Top: A flap = W (full coverage), B = dust flap; user can override A depth via f
       const topFlap_A = fOverride > 0 ? fOverride : W;
-      const dustH     = Math.max(20, Math.round(W / 6));
+      const dustH     = 0;  // B panels have NO top flap — top is fully covered by A flaps only
       // Bottom: standard RSC with of
       const botFlap_A  = Math.round(W / 2);
       const botFlapMin = Math.max(botFlap_A - ofVal, 1);
@@ -982,7 +982,10 @@ function genOnePieceSVG(L, W, H, CAL, vw, vh, extra) {
   });
 
   // ── Horizontal fold lines ─────────────────────────────────────────────────
-  folds += svgLine(tx(xA1), ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
+  // Top: only A panel areas have flaps — fold line only drawn under each A panel
+  folds += svgLine(tx(xA1), ty(yPanel), tx(xB1), ty(yPanel), 'fold');  // A1 top flap hinge
+  folds += svgLine(tx(xA2), ty(yPanel), tx(xB2), ty(yPanel), 'fold');  // A2 top flap hinge
+  // Bottom: all panels have flaps — fold line spans full width
   folds += svgLine(tx(xA1), ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
 
   // ── Bottom slot cuts only (top is full-overlap, no slots needed) ──────────
@@ -1008,8 +1011,7 @@ function genOnePieceSVG(L, W, H, CAL, vw, vh, extra) {
   dims += svgDim(tx(xA1)-DY, ty(yPanel),      tx(xA1)-DY, ty(yBotF),      `${H}`, true, 'D');
   // Top A flap height (large)
   dims += svgDim(tx(xA1)-DY, ty(yTopMaj),     tx(xA1)-DY, ty(yPanel),     `${topFlap_A}`, true, 'f');
-  // Top B dust flap height
-  dims += svgDim(tx(xB1)+4,  ty(yTopMin),     tx(xB1)+4,  ty(yPanel),     `${dustH}`, false);
+  // (B panels have no top flap — no dust flap annotation)
   // Bottom A flap height
   dims += svgDim(tx(xA2)-DY, ty(yBotF),       tx(xA2)-DY, ty(yBotMaj),   `${botFlap_A}`, true);
   // Bottom B flap height
@@ -1408,12 +1410,12 @@ function build0201_3D(L, W, H, CAL, scene, fVal) {
 }
 
 // One-Piece Lid 3D — same chain-fold animation as 0201
-// Top A flaps depth = W (large), Top B flaps depth = dustH (small dust flap)
+// Top A flaps depth = W (large), Top B panels have NO top flap
 // Bottom flaps = W/2 (standard RSC)
 function buildOnePiece3D(L, W, H, CAL, scene) {
   const T       = 4;
   const topFd_A = W;
-  const topFd_B = Math.max(20, Math.round(W / 6));
+  const topFd_B = 0;   // B panels have no top flap
   const botFd   = Math.round(W / 2);
   const mat     = CARDBOARD;
   const matF    = CARDBOARD_EDGE;
@@ -1433,11 +1435,14 @@ function buildOnePiece3D(L, W, H, CAL, scene) {
       const pts = [new THREE.Vector3(0, yLine, sz), new THREE.Vector3(panelW, yLine, sz)];
       pg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), scoreMat));
     });
+    // Top flap: only create if tfd > 0 (B panels have none)
     const tfp = new THREE.Group();
     tfp.position.set(panelW / 2, H, 0);
-    const tfm = new THREE.Mesh(new THREE.BoxGeometry(panelW - T * 2, tfd, T), matF);
-    tfm.position.set(0, tfd / 2, 0);
-    tfp.add(tfm);
+    if (tfd > 0) {
+      const tfm = new THREE.Mesh(new THREE.BoxGeometry(panelW - T * 2, tfd, T), matF);
+      tfm.position.set(0, tfd / 2, 0);
+      tfp.add(tfm);
+    }
     pg.add(tfp);
     const bfp = new THREE.Group();
     bfp.position.set(panelW / 2, 0, 0);

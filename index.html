@@ -37,7 +37,9 @@ body{font-family:'Noto Sans TC',sans-serif;background:#f0f0f0;overflow:hidden;he
 #svg-area svg{width:100%;height:100%}
 
 /* Right panel */
-#right-panel{width:260px;background:#fff;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#right-panel{width:260px;min-width:200px;max-width:520px;background:#fff;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;position:relative}
+#panel-resize{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;background:transparent;z-index:10}
+#panel-resize:hover,#panel-resize.dragging{background:rgba(67,97,238,0.25)}
 #right-panel.collapsed{width:32px;overflow:hidden}
 #panel-toggle{position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:14px;height:40px;background:#fff;border:1px solid #e0e0e0;border-right:none;border-radius:4px 0 0 4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888}
 #panel-inner{padding:12px;position:relative}
@@ -189,6 +191,7 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
 
     <!-- Right panel -->
     <div id="right-panel">
+      <div id="panel-resize" title="拖拉調整寬度"></div>
       <div id="panel-inner">
         <!-- 尺寸類型 -->
         <div class="pt-top-ctrl">
@@ -1688,6 +1691,33 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Initial calculation
   updateAll();
+
+  // Panel resize drag
+  (function() {
+    const handle = document.getElementById('panel-resize');
+    const panel  = document.getElementById('right-panel');
+    let dragging = false, startX = 0, startW = 0;
+    handle.addEventListener('mousedown', e => {
+      dragging = true; startX = e.clientX; startW = panel.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const delta = startX - e.clientX;   // drag left = wider
+      const newW  = Math.min(Math.max(startW + delta, 200), 520);
+      panel.style.width = newW + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+  })();
 });
 </script>
 </body>

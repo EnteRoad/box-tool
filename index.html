@@ -416,8 +416,8 @@ const BOX_LIBRARY = [
     svgGen(L, W, H, CAL, vw, vh, extra) {
       return gen0201SVG(L, W, H, CAL, vw, vh, extra);
     },
-    build3D(L, W, H, CAL, scene) {
-      return build0201_3D(L, W, H, CAL, scene);
+    build3D(L, W, H, CAL, scene, fVal) {
+      return build0201_3D(L, W, H, CAL, scene, fVal);
     }
   },
   {
@@ -918,9 +918,9 @@ function clearScene() {
 
 function render3D() {
   clearScene();
-  const { L, W, H, CAL } = getInputs();
+  const { L, W, H, CAL, f: fVal } = getInputs();
   const box = BOX_LIBRARY[currentBoxIdx];
-  box.build3D(L, W, H, CAL, scene);
+  box.build3D(L, W, H, CAL, scene, fVal);
   // Point camera at box centre & fit distance
   if (controls) {
     const dim = Math.max(L, W, H);
@@ -1147,9 +1147,9 @@ function addPanel(parent, w, h, x, y, z, rx, ry, rz) {
 //   Top flaps: rotation.x → +π/2   Bottom flaps: rotation.x → -π/2
 //
 // No static bottom — RSC 0201 bottom is formed by flap closure.
-function build0201_3D(L, W, H, CAL, scene) {
+function build0201_3D(L, W, H, CAL, scene, fVal) {
   const T  = 4;
-  const fd = Math.round(H / 2);
+  const fd = (fVal && fVal > 0) ? fVal : Math.round(H / 2);
   const mat  = CARDBOARD;
   const matF = CARDBOARD_EDGE;
   const scoreMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });

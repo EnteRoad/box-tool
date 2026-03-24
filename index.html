@@ -614,8 +614,9 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   let cuts = '', folds = '', dims = '';
 
   // ── Outer cut boundary — stepped profile showing high-low flap heights ──
-  // Top perimeter (left→right)
-  cuts += svgLine(tx(xGlue), ty(yTopMaj), tx(xB1),  ty(yTopMaj), 'cut');
+  // Top perimeter (left→right): glue tab has no flaps, so boundary steps at xA1
+  cuts += svgLine(tx(xA1),   ty(yPanel),  tx(xA1),  ty(yTopMaj), 'cut');  // step up at glue/A1
+  cuts += svgLine(tx(xA1),   ty(yTopMaj), tx(xB1),  ty(yTopMaj), 'cut');
   cuts += svgLine(tx(xB1),   ty(yTopMaj), tx(xB1),  ty(yTopMin), 'cut');
   cuts += svgLine(tx(xB1),   ty(yTopMin), tx(xA2),  ty(yTopMin), 'cut');
   cuts += svgLine(tx(xA2),   ty(yTopMin), tx(xA2),  ty(yTopMaj), 'cut');
@@ -631,23 +632,26 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   cuts += svgLine(tx(xA2),   ty(yBotMaj), tx(xA2),  ty(yBotMin), 'cut');
   cuts += svgLine(tx(xA2),   ty(yBotMin), tx(xB1),  ty(yBotMin), 'cut');
   cuts += svgLine(tx(xB1),   ty(yBotMin), tx(xB1),  ty(yBotMaj), 'cut');
-  cuts += svgLine(tx(xB1),   ty(yBotMaj), tx(xGlue),ty(yBotMaj), 'cut');
-  // Left edge
-  cuts += svgLine(tx(xGlue), ty(yBotMaj), tx(xGlue),ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yBotMaj), tx(xA1),  ty(yBotMaj), 'cut');  // A1 flap bottom
+  cuts += svgLine(tx(xA1),   ty(yBotMaj), tx(xA1),  ty(yBotF),   'cut');  // step down at glue/A1
+  // Glue tab perimeter — body-height rectangle only (no flaps)
+  cuts += svgLine(tx(xA1),   ty(yBotF),   tx(xGlue),ty(yBotF),   'cut');  // glue tab bottom
+  cuts += svgLine(tx(xGlue), ty(yBotF),   tx(xGlue),ty(yPanel),  'cut');  // glue tab left edge
+  cuts += svgLine(tx(xGlue), ty(yPanel),  tx(xA1),  ty(yPanel),  'cut');  // glue tab top
 
   // ── Vertical fold lines (panel dividers, body zone only) ──────────────
   [xA1, xB1, xA2, xB2].forEach(x => {
     folds += svgLine(tx(x), ty(yPanel), tx(x), ty(yBotF), 'fold');
   });
 
-  // ── Horizontal fold lines (flap hinges) ─────────────────────────────
-  folds += svgLine(tx(xGlue), ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
-  folds += svgLine(tx(xGlue), ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
+  // ── Horizontal fold lines (flap hinges) — start at xA1, glue tab has no flaps ──
+  folds += svgLine(tx(xA1),   ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
+  folds += svgLine(tx(xA1),   ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
 
   // ── Slot cuts — left/right lines differ in depth for A/B boundaries ────
   // [position, leftIsMajor, rightIsMajor]
   const slotDefs = [
-    [xA1, true,  true ],   // glue ↔ A1
+    // xA1 slot removed — glue tab has no flaps; outer boundary step at xA1 already separates them
     [xB1, true,  false],   // A1  ↔ B1
     [xA2, false, true ],   // B1  ↔ A2
     [xB2, true,  false],   // A2  ↔ B2
@@ -697,8 +701,8 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
                    `${flapMin}`, false, 'of');
   }
 
-  // Glue tab width (clickable → g)
-  dims += svgDim(tx(xGlue), ty(yTopMaj)-DY*2, tx(xA1), ty(yTopMaj)-DY*2,
+  // Glue tab width (clickable → g) — annotated above the glue tab top edge
+  dims += svgDim(tx(xGlue), ty(yPanel)-DY, tx(xA1), ty(yPanel)-DY,
                  `g:${glue}`, true, 'g');
 
   // Slot width annotation on top slot at xB1

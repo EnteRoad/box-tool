@@ -659,16 +659,40 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   const xEnd  = xB2 + panelB_w;   // = flatW
 
   // Y row boundaries
-  const yTop    = 0;
   const yPanel  = flapH;
   const yBotF   = flapH + panelA_h;
+  // Major flaps (A panels + glue): full flapH; minor flaps (B panels): flapH - ofVal
+  const flapMin = Math.max(flapH - ofVal, 1);
+  const yTopMaj = 0;
+  const yTopMin = flapH - flapMin;   // = ofVal (but clamped)
+  const yBotMaj = flatH;
+  const yBotMin = flatH - (flapH - flapMin);
 
   let cuts = '', folds = '', dims = '';
 
-  // ── Outer cut boundary ──────────────────────────────────────────────────
-  cuts += svgRect(tx(xGlue), ty(yTop), s(flatW), s(flatH), 'cut');
+  // ── Outer cut boundary — stepped profile showing high-low flap heights ──
+  // Top perimeter (left→right)
+  cuts += svgLine(tx(xGlue), ty(yTopMaj), tx(xB1),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yTopMaj), tx(xB1),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yTopMin), tx(xA2),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yTopMin), tx(xA2),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yTopMaj), tx(xB2),  ty(yTopMaj), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yTopMaj), tx(xB2),  ty(yTopMin), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yTopMin), tx(xEnd), ty(yTopMin), 'cut');
+  // Right edge
+  cuts += svgLine(tx(xEnd),  ty(yTopMin), tx(xEnd), ty(yBotMin), 'cut');
+  // Bottom perimeter (right→left)
+  cuts += svgLine(tx(xEnd),  ty(yBotMin), tx(xB2),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yBotMin), tx(xB2),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xB2),   ty(yBotMaj), tx(xA2),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yBotMaj), tx(xA2),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xA2),   ty(yBotMin), tx(xB1),  ty(yBotMin), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yBotMin), tx(xB1),  ty(yBotMaj), 'cut');
+  cuts += svgLine(tx(xB1),   ty(yBotMaj), tx(xGlue),ty(yBotMaj), 'cut');
+  // Left edge
+  cuts += svgLine(tx(xGlue), ty(yBotMaj), tx(xGlue),ty(yTopMaj), 'cut');
 
-  // ── Vertical fold lines (panel dividers) ──────────────────────────────
+  // ── Vertical fold lines (panel dividers, body zone only) ──────────────
   [xA1, xB1, xA2, xB2].forEach(x => {
     folds += svgLine(tx(x), ty(yPanel), tx(x), ty(yBotF), 'fold');
   });
@@ -677,53 +701,43 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   folds += svgLine(tx(xGlue), ty(yPanel), tx(xEnd), ty(yPanel), 'fold');
   folds += svgLine(tx(xGlue), ty(yBotF),  tx(xEnd), ty(yBotF),  'fold');
 
-  // ── Slot cuts between adjacent flaps (top and bottom) ─────────────────
-  // RSC slots run vertically between B-panel flaps and A-panel flaps.
-  // At B1/A2 boundary: top + bottom slot
-  // At B2/end: no slot (B2 flap is last)
-  // We represent the slots as short vertical cut lines on the fold line
-  // Slots: two vertical cut lines on each side of a fold-line position.
-  // The outer-edge horizontal lines are already drawn by svgRect (outer boundary).
-  function drawSlots(panelX) {
-    const sx = tx(panelX);
-    const sw = s(slotW / 2);
-    cuts += svgLine(sx - sw, ty(yTop),  sx - sw, ty(yPanel),        'cut');
-    cuts += svgLine(sx + sw, ty(yTop),  sx + sw, ty(yPanel),        'cut');
-    cuts += svgLine(sx - sw, ty(yBotF), sx - sw, ty(yBotF + flapH), 'cut');
-    cuts += svgLine(sx + sw, ty(yBotF), sx + sw, ty(yBotF + flapH), 'cut');
-  }
-  // Slots at each inter-panel fold line (xA1 = left edge of first panel / right of glue)
-  [xA1, xB1, xA2, xB2].forEach(drawSlots);
-
-  // ── Flap height annotation: minor vs major ────────────────────────────
-  // Top minor flap (B1, B2): flapH - ofVal in height → show as flapW_minor
-  // Top major flap (A1, A2): flapH
+  // ── Slot cuts — left/right lines differ in depth for A/B boundaries ────
+  // [position, leftIsMajor, rightIsMajor]
+  const slotDefs = [
+    [xA1, true,  true ],   // glue ↔ A1
+    [xB1, true,  false],   // A1  ↔ B1
+    [xA2, false, true ],   // B1  ↔ A2
+    [xB2, true,  false],   // A2  ↔ B2
+  ];
+  slotDefs.forEach(([px, lMaj, rMaj]) => {
+    const sx = tx(px), sw = s(slotW / 2);
+    cuts += svgLine(sx - sw, ty(yPanel), sx - sw, ty(lMaj ? yTopMaj : yTopMin), 'cut');
+    cuts += svgLine(sx + sw, ty(yPanel), sx + sw, ty(rMaj ? yTopMaj : yTopMin), 'cut');
+    cuts += svgLine(sx - sw, ty(yBotF),  sx - sw, ty(lMaj ? yBotMaj : yBotMin), 'cut');
+    cuts += svgLine(sx + sw, ty(yBotF),  sx + sw, ty(rMaj ? yBotMaj : yBotMin), 'cut');
+  });
 
   // ── Dimension annotations ─────────────────────────────────────────────
   const DY = 14;  // offset above/below blank for dims
 
   // Overall blank width (total)
-  dims += svgDim(tx(xGlue), ty(yTop)-DY, tx(xEnd), ty(yTop)-DY,
+  dims += svgDim(tx(xGlue), ty(yTopMaj)-DY, tx(xEnd), ty(yTopMaj)-DY,
     `${r(flatW)} mm`, true);
 
-  // Overall blank height (right side)
-  dims += svgDim(tx(xEnd)+DY, ty(yTop), tx(xEnd)+DY, ty(flatH),
+  // Overall blank height (right side, major height)
+  dims += svgDim(tx(xEnd)+DY, ty(yTopMaj), tx(xEnd)+DY, ty(yBotMaj),
     `${r(flatH)} mm`, false);
 
   // Panel widths — annotated inside each panel at mid-height
-  // A1 width = L (clickable → L)
   dims += svgDim(tx(xA1), ty(yPanel + panelA_h/2),
                  tx(xB1), ty(yPanel + panelA_h/2),
                  `${L}`, false, 'L');
-  // B1 width = W (clickable → W)
   dims += svgDim(tx(xB1), ty(yPanel + panelA_h/2),
                  tx(xA2), ty(yPanel + panelA_h/2),
                  `${W}`, false, 'W');
-  // A2 width = L again (no param link, duplicate)
   dims += svgDim(tx(xA2), ty(yPanel + panelA_h/2),
                  tx(xB2), ty(yPanel + panelA_h/2),
                  `${L}`, false, 'L');
-  // B2 width = W again
   dims += svgDim(tx(xB2), ty(yPanel + panelA_h/2),
                  tx(xEnd), ty(yPanel + panelA_h/2),
                  `${W}`, false, 'W');
@@ -732,23 +746,23 @@ function gen0201SVG(L, W, H, CAL, vw, vh, extra) {
   dims += svgDim(tx(xA1)-DY, ty(yPanel), tx(xA1)-DY, ty(yBotF),
                  `${H}`, true, 'D');
 
-  // Top flap height = flapH (clickable → f)
-  dims += svgDim(tx(xA1)-DY, ty(yTop), tx(xA1)-DY, ty(yPanel),
+  // Top flap height — major (A) shown on left, minor (B) shown above B1
+  dims += svgDim(tx(xA1)-DY, ty(yTopMaj), tx(xA1)-DY, ty(yPanel),
                  `${flapH}`, true, 'f');
+  if (ofVal > 0) {
+    dims += svgDim(tx(xB1)+4, ty(yTopMin), tx(xB1)+4, ty(yPanel),
+                   `${flapMin}`, false, 'of');
+  }
 
   // Glue tab width (clickable → g)
-  dims += svgDim(tx(xGlue), ty(yTop)-DY*2, tx(xA1), ty(yTop)-DY*2,
+  dims += svgDim(tx(xGlue), ty(yTopMaj)-DY*2, tx(xA1), ty(yTopMaj)-DY*2,
                  `g:${glue}`, true, 'g');
 
   // Slot width annotation on top slot at xB1
-  dims += svgDim(tx(xB1 - slotW/2), ty(yTop/2),
-                 tx(xB1 + slotW/2), ty(yTop/2),
+  dims += svgDim(tx(xB1 - slotW/2), ty(yTopMin + (yPanel - yTopMin)/2),
+                 tx(xB1 + slotW/2), ty(yTopMin + (yPanel - yTopMin)/2),
                  `sl:${r(slotW)}`, false, 'sl');
 
-  // High-low offset annotation on B1 top flap (show flapW_minor)
-  dims += svgDim(tx(xB1), ty(yTop),
-                 tx(xA2), ty(yTop),
-                 `of:${d.flapH - flapW_minor > 0 ? d.flapH - flapW_major : ''}`, false, 'of');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" style="background:#fff">
   <g id="dims">${dims}</g>

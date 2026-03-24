@@ -251,7 +251,10 @@ hr.divider{border:none;border-top:1px solid #eee;margin:8px 0}
           <div class="pt-row" id="pr-g" data-param="g">
             <span class="pt-layer">2</span><span class="pt-code">g</span>
             <span class="pt-desc">黏位長</span>
-            <span class="pt-val"><input type="number" id="inp-g" value="30" min="5" max="100" onkeydown="if(event.key==='Enter')submitDims()"></span>
+            <span class="pt-val" style="display:flex;gap:4px;align-items:center">
+              <input type="checkbox" id="chk-g" checked title="啟用黏位" style="margin:0;cursor:pointer" onchange="toggleGlueTab(this.checked)">
+              <input type="number" id="inp-g" value="30" min="5" max="100" onkeydown="if(event.key==='Enter')submitDims()">
+            </span>
           </div>
           <div class="pt-sep"></div>
           <div class="pt-row" id="pr-f" data-param="f">
@@ -387,7 +390,7 @@ const BOX_LIBRARY = [
       const panelA_h = H + 2 * CAL;
       const panelB_w = W + CAL;
       // Glue tab
-      const glue = Math.max(gTab, CAL + 5);
+      const glue = gTab > 0 ? Math.max(gTab, CAL + 5) : 0;
       // Manufacturing blank size
       const mfgW = panelA_w * 2 + panelB_w * 2 + glue;
       const mfgH = flapH + panelA_h + flapH;
@@ -509,16 +512,23 @@ let calcData = null;
 // ============================================================
 function getInputs() {
   const g = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; };
+  const glueEnabled = document.getElementById('chk-g') ? document.getElementById('chk-g').checked : true;
   return {
     L:   g('inp-L')  || 300,
     W:   g('inp-W')  || 200,
     H:   g('inp-H')  || 150,
     CAL: g('inp-t')  || 3,
     of:  isNaN(g('inp-of'))  ? 1  : (g('inp-of')  || 0),
-    gTab:isNaN(g('inp-g'))   ? 30 : (g('inp-g')   || 30),
+    gTab: glueEnabled ? (isNaN(g('inp-g')) ? 30 : (g('inp-g') || 30)) : 0,
     f:   isNaN(g('inp-f'))   ? 0  : (g('inp-f')   || 0),
     sl:  isNaN(g('inp-sl'))  ? 0  : (g('inp-sl')  || 0),
   };
+}
+
+function toggleGlueTab(enabled) {
+  const inp = document.getElementById('inp-g');
+  if (inp) { inp.disabled = !enabled; inp.style.opacity = enabled ? '' : '0.35'; }
+  submitDims();
 }
 
 // ============================================================
